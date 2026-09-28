@@ -26,7 +26,7 @@ typedef struct {
 
 ImageInfo imageInfo;
 
-Widget CreateXlogoButton (Widget parent, char *pngFile);
+Widget createPixmapCanvas (Widget parent, char *pngFile);
 
 void readpng_version_info() {
     fprintf(stderr, "   Compiled with libpng %s; using libpng %s.\n",
@@ -35,7 +35,10 @@ void readpng_version_info() {
       ZLIB_VERSION, zlib_version);
 }
 
-static void TeardownPng (png_structp png, png_infop info) {
+/*
+ * Code taken from https://github.com/daneshih1125/xlib/blob/master/xlib_putpng.c
+ */
+static void teardownPng (png_structp png, png_infop info) {
     if (png) {
         png_infop *realInfo = (info? &info: NULL);
         png_destroy_read_struct (&png, realInfo, NULL);
@@ -45,7 +48,7 @@ static void TeardownPng (png_structp png, png_infop info) {
 /*
  * Code taken from https://github.com/daneshih1125/xlib/blob/master/xlib_putpng.c
  */
-void LoadPng(FILE *file, unsigned char** data, char **clipData, unsigned int *width, unsigned int *height,
+void loadPng(FILE *file, unsigned char** data, char **clipData, unsigned int *width, unsigned int *height,
     unsigned int *rowbytes) {
     size_t size = 0, clipSize = 0;
 
@@ -111,7 +114,7 @@ void LoadPng(FILE *file, unsigned char** data, char **clipData, unsigned int *wi
             }
         }
     }
-    TeardownPng (png, info);
+    teardownPng (png, info);
     free (rowPointers);
 }
 
@@ -183,7 +186,7 @@ void resizeCallback(Widget button, XtPointer xt_pointer, XtPointer xt_pointer1) 
     //XtVaSetValues(XtParent(button), XmNallowShellResize, True, NULL);
 }
 
-Widget CreateXlogoButton(Widget parent, char *pngFile) {
+Widget createPixmapCanvas(Widget parent, char *pngFile) {
     Widget button;
     Display *dpy = XtDisplay(parent);
 
@@ -204,7 +207,7 @@ Widget CreateXlogoButton(Widget parent, char *pngFile) {
         fprintf(stderr, "Error opening file\n");
         return button;
     }
-    LoadPng(fp, &data, &clip, &imageInfo.width, &imageInfo.height, &png_bytes);
+    loadPng(fp, &data, &clip, &imageInfo.width, &imageInfo.height, &png_bytes);
     fclose(fp);
 
     imageInfo.image = XCreateImage (dpy, DefaultVisual(dpy, screen),
@@ -229,7 +232,7 @@ void main( int argc, char **argv ) {
     shell = XtAppInitialize ( &app, "XPmlogo", NULL, 0,
                               &argc, argv, NULL, NULL, 0  );
 
-    button = CreateXlogoButton( shell, pngFile );
+    button = createPixmapCanvas( shell, pngFile );
 
     XtRealizeWidget ( shell );
     XtAppMainLoop ( app );

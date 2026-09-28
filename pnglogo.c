@@ -14,7 +14,7 @@
 #include "zlib.h"
 #include "stdlib.h"
 
-Widget CreateXlogoButton (Widget parent, char *pngFile);
+Widget createPixmapCanvas (Widget parent, char *pngFile);
 
 void readpng_version_info() {
     fprintf(stderr, "   Compiled with libpng %s; using libpng %s.\n",
@@ -23,7 +23,7 @@ void readpng_version_info() {
       ZLIB_VERSION, zlib_version);
 }
 
-Widget CreateXlogoButton(Widget parent, char *pngFile) {
+Widget createPixmapCanvas(Widget parent, char *pngFile) {
     Widget button;
     Pixmap pix = None;
     Pixmap mask = None;
@@ -181,7 +181,7 @@ void main ( int argc, char **argv ) {
     shell = XtAppInitialize ( &app, "XPmlogo", NULL, 0,
                               &argc, argv, NULL, NULL, 0  );
 
-    button = CreateXlogoButton( shell, pngFile );
+    button = createPixmapCanvas( shell, pngFile );
 
     XtRealizeWidget ( shell );
     XtAppMainLoop ( app );
