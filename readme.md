@@ -12,3 +12,11 @@ and handles the display of the image inside a Canvas widget.
 It uses redisplay/resize callbacks to scale the image if the
 root window is manually resized. For scaling, XRender library is used.
 Setup and sclaing is very fast.
+
+### viewer.c
+Displays PNG format images from a directory in an endless loop. 
+Uses libpng for loading PNG files.
+
+### jviewer.c
+Like viewer.c, but can display both PNG and JPEG format images. 
+Uses libjpeg for loading JPEG file.
