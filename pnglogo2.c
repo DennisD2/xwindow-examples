@@ -1,5 +1,5 @@
 /********************************************************************
- * This example shows how to load a PNG and use it as a pixmap. Uses libpng.
+ * This example shows how to load a PNG and use it as a pixmap. Uses libpng and libXrender.
  * The code loads the PNG file, creates a XImage definition that is used on redisplay/resize
  * events to set the pixmap in a Canvas widget.
  * Because XRender extension is used for scaling and an XImage structure is used,
