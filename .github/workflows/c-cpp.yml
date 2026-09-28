@@ -1,0 +1,31 @@
+name: Clang CI - OpenSuse Container Build
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  opensuse-container-build:
+    runs-on: ubuntu-latest  
+    container:
+      image: opensuse/leap
+      
+    steps:
+      - name: prepare container for build
+        run: |
+          cat /etc/os-release
+          zypper refresh
+          zypper install -y git gcc make
+          zypper install -y libXt6 libXt-devel libXm4 motif-devel libX11-6 libX11-devel libXpm4 libXpm-devel
+        
+      - name: code checkout 
+        uses: actions/checkout@v6
+        
+      - name: build
+        run: |
+          pwd 
+          echo "----" 
+          make all
+
