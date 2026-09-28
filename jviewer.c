@@ -73,7 +73,7 @@ XImage* load_jpeg_to_ximage(Display *dpy, Visual *visual, unsigned int depth, co
     // Open file
     char fn[128];
     sprintf(fn,"%s/%s", imageInfo.dirPath, filename);
-    printf("Open file: %s\n", fn);
+    printf("Open file %d: %s\n", current, fn);
     if ((infile = fopen(fn, "rb")) == NULL) {
         fprintf(stderr, "Error opening %sn", filename);
         return NULL;
@@ -287,7 +287,7 @@ bool loadPngFromFile(char *pngFile, unsigned char **data, int *png_bytes) {
     // Open PNG file
     char fn[128];
     sprintf(fn,"%s/%s", imageInfo.dirPath, pngFile);
-    printf("Open file: %s\n", fn);
+    printf("Open file %d: %s\n", current, fn);
     FILE *fp = fopen(fn, "rb");
     if (!fp) {
         fprintf(stderr, "Error opening file\n");
@@ -366,11 +366,10 @@ Widget createPixmapCanvas(Widget parent, char *pngFile) {
  * Timeout callback
  */
 static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
-    printf("TimeoutCB\n");
+    //printf("TimeoutCB\n");
     unsigned char *data;
     int png_bytes;
 
-    //printf("current=%d, maximage=%d\n", current, maximage);
     char *file = filenames[current];
     current++;
     if (current==maximage) {
@@ -422,7 +421,7 @@ void main( int argc, char **argv ) {
     while ((entry = readdir(dir)) != NULL) {
         char  *name = entry->d_name;
         if (endsWith(name, ".png") || endsWith(name, ".jpg")) {
-            printf("- %s\n", entry->d_name);
+            //printf("- %s\n", entry->d_name);
             filenames[maximage] = malloc(strlen(name)+1);
             strcpy(filenames[maximage], name);
             maximage++;
