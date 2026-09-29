@@ -36,12 +36,10 @@ typedef struct {
     int frame_count;
     int width;
     int height;
+    int currentframe;
 } GifAnimation;
 
 GifAnimation anim;
-
-//int maxframes = 0;
-int currentframe = 0; // frame to play
 
 int endsWith(const char *str, const char *suffix) {
     size_t len_str = strlen(str);
@@ -92,17 +90,10 @@ XImage *gifCanvasToImage(Display *display, Visual *visual,
     }
 
     int screen = DefaultScreen(display);
-    XImage *ximage = XCreateImage(
-        display,
-        visual,
-        DefaultDepth(display, screen),
-        ZPixmap,
-        0,
-        image_data,
-        width,
-        height,
-        32,
-        0  // 0 means xlib calculates it
+    XImage *ximage = XCreateImage(display, visual, DefaultDepth(display, screen),
+        ZPixmap, 0,
+        image_data, width, height,
+        32, 0  // 0 means xlib calculates it
     );
 
     if (!ximage) {
@@ -110,6 +101,8 @@ XImage *gifCanvasToImage(Display *display, Visual *visual,
         return NULL;
     }
 
+    // copy rgb values to image
+    //memcpy(ximage->data, rgbBuffer, width * height * bytes_per_pixel);
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             int canvas_index = 3*(y * width + x);
@@ -209,7 +202,6 @@ XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, con
         uint8_t *rgbBuffer = malloc(anim.width * anim.height * 4);
         gd_render_frame(gif, rgbBuffer);
 
-        // 1. Konvertiere das aktuelle Canvas in ein XImage und speichere es im Array
         anim.frames[anim.frame_count] = gifCanvasToImage(dpy, visual, gif, rgbBuffer, depth, &anim.width, &anim.height);
 
         // 2. Speicher die Frame-Verzögerung (gif->gce.delay ist in Hundertstelsekunden, daher * 10 für Millisekunden)
@@ -221,12 +213,12 @@ XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, con
 
     gd_close_gif(gif);
     dumpFrames(&anim);
-    // Gibt zum Beispiel den ersten Frame als Startbild zurück
+
     imageInfo.image = anim.frames[0];
     imageInfo.width = anim.width;
     imageInfo.height = anim.height;
-    imageInfo.depth = anim.frames[currentframe]->depth;
-    currentframe=0;
+    imageInfo.depth = anim.frames[anim.currentframe]->depth;
+    anim.currentframe=0;
 
     return anim.frames[0];
 }
@@ -255,19 +247,15 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
 static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     //printf("TimeoutCB, currentframe=%d\n", currentframe);
 
-    //XtVaSetValues(XtParent(imageInfo.canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
-    //handleGeometryChanges(imageInfo.canvas);
-
-    //XDestroyImage(imageInfo.image);
-    imageInfo.image = anim.frames[currentframe];
+    imageInfo.image = anim.frames[anim.currentframe];
     imageInfo.width = anim.width;
     imageInfo.height = anim.height;
-    imageInfo.depth = anim.frames[currentframe]->depth;
-    timeout = anim.delays[currentframe];
+    imageInfo.depth = anim.frames[anim.currentframe]->depth;
+    timeout = anim.delays[anim.currentframe];
 
-    currentframe++;
-    if (currentframe == anim.frame_count) {
-        currentframe = 0;
+    anim.currentframe++;
+    if (anim.currentframe == anim.frame_count) {
+        anim.currentframe = 0;
     }
 
     XtVaSetValues(XtParent(imageInfo.canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
@@ -292,6 +280,8 @@ int main( int argc, char **argv ) {
     if (argc > 1) {
         file = argv[1];
     }
+
+    anim.currentframe = 0;
     canvas = createPixmapCanvas(shell, file);
 
     XtRealizeWidget ( shell );
