@@ -186,35 +186,18 @@ XImage *gifCanvasToImageSlow(Display *display, Visual *visual, unsigned int dept
         return NULL;
     }
 
-    // dump LUT
-    /*printf("Colortable, size %d\n", gif->palette->size);
-    for (int i = 0; i < gif->palette->size; i++) {
-        uint8_t r = gif->palette->colors[3*i];
-        uint8_t g = gif->palette->colors[3*i+1];
-        uint8_t b = gif->palette->colors[3*i+2];
-        printf("color[%d] = %d,%d,%d\n", i, r, g, b);
-    }*/
-
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             int canvas_index = y * width + x;
-            uint8_t color_idx = gif->canvas[canvas_index*3];
-            // RGB-Werte aus der GIF-Palette holen
-            uint8_t r = gif->palette->colors[color_idx*3  + 0];
-            uint8_t g = gif->palette->colors[color_idx*3  + 1];
-            uint8_t b = gif->palette->colors[color_idx*3  + 2];
-
-            // RGB-Werte in das Pixelformat des X-Visuals/Bildschirms packen
-            // Xlib verwendet oft das Format 0x00RRGGBB (oder BGR je nach System)
-            Pixel pixel = (r << 16) | (g << 8) | b;
-
-            // Sicherer Xlib-Befehl, um das formatierte Pixel in den Speicher zu schreiben
+            uint8_t r = gif->canvas[3*canvas_index+0];
+            uint8_t g = gif->canvas[3*canvas_index+1];
+            uint8_t b = gif->canvas[3*canvas_index+2];
+            Pixel pixel = (r<<16)|(g<<8)|b;
             XPutPixel(ximage, x, y, pixel);
         }
     }
     return ximage;
 }
-
 
 /**
  * Handles geometry changes. uses XRender extension for fast scaling.
