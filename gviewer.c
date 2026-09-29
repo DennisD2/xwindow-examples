@@ -348,7 +348,6 @@ XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, con
     maxframes = anim.frame_count;
     printf("maxframes: %d\n", maxframes);
 
-
     gd_close_gif(gif);
     //dumpFrames(&anim);
     // Gibt zum Beispiel den ersten Frame als Startbild zurück
