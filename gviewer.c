@@ -198,11 +198,11 @@ XImage *gifCanvasToImageSlow(Display *display, Visual *visual, unsigned int dept
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             int canvas_index = y * width + x;
-            uint8_t color_idx = gif->canvas[canvas_index];
+            uint8_t color_idx = gif->canvas[canvas_index*3];
             // RGB-Werte aus der GIF-Palette holen
-            uint8_t r = gif->palette->colors[color_idx * 3 + 0];
-            uint8_t g = gif->palette->colors[color_idx * 3 + 1];
-            uint8_t b = gif->palette->colors[color_idx * 3 + 2];
+            uint8_t r = gif->palette->colors[color_idx*3  + 0];
+            uint8_t g = gif->palette->colors[color_idx*3  + 1];
+            uint8_t b = gif->palette->colors[color_idx*3  + 2];
 
             // RGB-Werte in das Pixelformat des X-Visuals/Bildschirms packen
             // Xlib verwendet oft das Format 0x00RRGGBB (oder BGR je nach System)
