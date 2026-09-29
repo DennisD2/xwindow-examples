@@ -189,8 +189,10 @@ void resizeCallback(Widget button, XtPointer xt_pointer, XtPointer xt_pointer1) 
 XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
     int *w, int *h) {
     gd_GIF *gif = gd_open_gif(filename);
-    if (!gif) return NULL;
-
+    if (!gif) {
+        printf("Unable to load GIF file %s. Exiting.\n", filename);
+        exit(1);
+    }
     anim.width = gif->width;
     anim.height = gif->height;
     *w = gif->width;
@@ -250,21 +252,22 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     imageInfo.image = anim.frames[anim.currentframe];
     imageInfo.width = anim.width;
     imageInfo.height = anim.height;
-    imageInfo.depth = anim.frames[anim.currentframe]->depth;
-    timeout = anim.delays[anim.currentframe];
+    if (anim.frames[anim.currentframe] != NULL) {
+        imageInfo.depth = anim.frames[anim.currentframe]->depth;
+        timeout = anim.delays[anim.currentframe];
 
-    anim.currentframe++;
-    if (anim.currentframe == anim.frame_count) {
-        anim.currentframe = 0;
+        anim.currentframe++;
+        if (anim.currentframe == anim.frame_count) {
+            anim.currentframe = 0;
+        }
+
+        XtVaSetValues(XtParent(imageInfo.canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
+        handleGeometryChanges(imageInfo.canvas);
+        /*
+         * start time out from the beginning
+        */
+        XtAppAddTimeOut( imageInfo.app, timeout, TimeoutCB, NULL );
     }
-
-    XtVaSetValues(XtParent(imageInfo.canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
-    handleGeometryChanges(imageInfo.canvas);
-
-    /*
-     * start time out from the beginning
-     */
-    XtAppAddTimeOut( imageInfo.app, timeout, TimeoutCB, NULL );
 }
 
 int main( int argc, char **argv ) {

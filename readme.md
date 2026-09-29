@@ -20,3 +20,10 @@ Uses libpng for loading PNG files.
 ### jviewer.c
 Like viewer.c, but can display both PNG and JPEG format images. 
 Uses libjpeg for loading JPEG file.
+
+### gviewer.c
+Display GIF files, animated and non-animated. Uses gifdec-Implementation
+to decode GIF format. 
+
+## Related
+* gifdec code for decoding GIF files - https://github.com/lecram/gifdec
