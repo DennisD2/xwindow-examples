@@ -32,13 +32,16 @@ ImageInfo imageInfo;
 
 typedef struct {
     XImage *frames[MAX_FRAMES];
-    int delays[MAX_FRAMES]; // Speichert, wie lange jeder Frame sichtbar sein soll (in ms)
+    int delays[MAX_FRAMES];
     int frame_count;
     int width;
     int height;
 } GifAnimation;
 
 GifAnimation anim;
+
+//int maxframes = 0;
+int currentframe = 0; // frame to play
 
 int endsWith(const char *str, const char *suffix) {
     size_t len_str = strlen(str);
@@ -70,7 +73,7 @@ void dumpFrames(GifAnimation *a) {
     }
 }
 
-XImage *gifCanvasToImageSlow(Display *display, Visual *visual,
+XImage *gifCanvasToImage(Display *display, Visual *visual,
     gd_GIF *gif , uint8_t *rgbBuffer, unsigned int depth,
     int *w, int *h) {
     if (!gif || !gif->canvas || !gif->palette) {
@@ -82,16 +85,12 @@ XImage *gifCanvasToImageSlow(Display *display, Visual *visual,
     *w = width;
     *h = height;
 
-    // 1. Speicher für die rohen Bilddaten des XImage reservieren (z. B. 4 Bytes pro Pixel bei 32-Bit Tiefe)
-    // Bei TrueColor/ZPixmap wird empfohlen, den Puffer dynamisch zu erzeugen.
     int bytes_per_pixel = (depth <= 8) ? 1 : ((depth <= 16) ? 2 : 4);
     char *image_data = malloc(width * height * bytes_per_pixel);
     if (!image_data) {
         return NULL;
     }
 
-    // 2. Die XImage-Struktur initialisieren
-    // ZPixmap sorgt dafür, dass die Pixel zeilenweise hinterlegt sind (Scanlines)
     int screen = DefaultScreen(display);
     XImage *ximage = XCreateImage(
         display,
@@ -102,8 +101,8 @@ XImage *gifCanvasToImageSlow(Display *display, Visual *visual,
         image_data,
         width,
         height,
-        32,       // Bitmap-Padding (üblich sind 32 Bit)
-        0         // bytes_per_line auf 0 setzen: Xlib berechnet es automatisch
+        32,
+        0  // 0 means xlib calculates it
     );
 
     if (!ximage) {
@@ -141,9 +140,6 @@ void handleGeometryChanges(Widget button) {
     Dimension new_h = prefered.height;
     //printf("new_w=%d, new_h=%d\n", new_w, new_h);
 
-    //dumpFrames(&anim);
-    //printf("src width=%d, height=%d\n", src_ximage->width, src_ximage->height);
-    //printf("img width=%d, height=%d\n", imageInfo.image->width, imageInfo.image->height);
     Pixmap temp_pixmap = XCreatePixmap(dpy, win,
                                        src_ximage->width, src_ximage->height,
                                        src_ximage->depth);
@@ -196,8 +192,6 @@ void resizeCallback(Widget button, XtPointer xt_pointer, XtPointer xt_pointer1) 
     //XtVaSetValues(XtParent(button), XmNallowShellResize, True, NULL);
 }
 
-int maxframes = 0;
-int currentframe = 0;
 
 XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
     int *w, int *h) {
@@ -216,7 +210,7 @@ XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, con
         gd_render_frame(gif, rgbBuffer);
 
         // 1. Konvertiere das aktuelle Canvas in ein XImage und speichere es im Array
-        anim.frames[anim.frame_count] = gifCanvasToImageSlow(dpy, visual, gif, rgbBuffer, depth, &anim.width, &anim.height);
+        anim.frames[anim.frame_count] = gifCanvasToImage(dpy, visual, gif, rgbBuffer, depth, &anim.width, &anim.height);
 
         // 2. Speicher die Frame-Verzögerung (gif->gce.delay ist in Hundertstelsekunden, daher * 10 für Millisekunden)
         anim.delays[anim.frame_count] = gif->gce.delay * 10;
@@ -224,7 +218,6 @@ XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, con
 
         anim.frame_count++;
     }
-    maxframes = anim.frame_count;
 
     gd_close_gif(gif);
     dumpFrames(&anim);
@@ -273,7 +266,7 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     timeout = anim.delays[currentframe];
 
     currentframe++;
-    if (currentframe == maxframes) {
+    if (currentframe == anim.frame_count) {
         currentframe = 0;
     }
 
@@ -295,7 +288,6 @@ int main( int argc, char **argv ) {
     imageInfo.app = app;
     imageInfo.shell = shell;
 
-    //char *file = "test-images/dilbert.gif";
     char *file = "test-images/halbes_pferd.gif";
     if (argc > 1) {
         file = argv[1];
