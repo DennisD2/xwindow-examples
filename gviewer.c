@@ -188,10 +188,10 @@ XImage *gifCanvasToImageSlow(Display *display, Visual *visual, unsigned int dept
 
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            int canvas_index = y * width + x;
-            uint8_t r = gif->canvas[3*canvas_index+0];
-            uint8_t g = gif->canvas[3*canvas_index+1];
-            uint8_t b = gif->canvas[3*canvas_index+2];
+            int canvas_index = 3*(y * width + x);
+            uint8_t r = gif->canvas[canvas_index+0];
+            uint8_t g = gif->canvas[canvas_index+1];
+            uint8_t b = gif->canvas[canvas_index+2];
             Pixel pixel = (r<<16)|(g<<8)|b;
             XPutPixel(ximage, x, y, pixel);
         }
