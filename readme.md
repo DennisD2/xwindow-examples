@@ -26,4 +26,5 @@ Display GIF files, animated and non-animated. Uses gifdec-Implementation
 to decode GIF format. 
 
 ## Related
-* gifdec code for decoding GIF files - https://github.com/lecram/gifdec
+* gifdec code for decoding GIF files - https://github.com/lecram/gifdec.
+  Cannot load GIFs without global color table. 
