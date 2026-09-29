@@ -5,6 +5,7 @@
 #include <X11/Xlib.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #include <Xm/Xm.h>
 #include <Xm/DrawingA.h>
@@ -12,7 +13,8 @@
 #include <X11/Intrinsic.h>
 #include <X11/extensions/Xrender.h>
 
-#define TIMEOUT_NOSECONDS 10000L
+#define TIMEOUT_NOSECONDS 200L
+int timeout = TIMEOUT_NOSECONDS;
 
 typedef struct {
     XImage *image;
@@ -24,6 +26,7 @@ typedef struct {
     Widget canvas;
     XtAppContext app;
     char *dirPath;
+    int valid;
 } ImageInfo;
 #
 ImageInfo imageInfo;
@@ -113,6 +116,36 @@ static int get_shift(unsigned long mask) {
     return shift;
 }
 
+#define MAX_FRAMES 500
+
+typedef struct {
+    XImage *frames[MAX_FRAMES];
+    int delays[MAX_FRAMES]; // Speichert, wie lange jeder Frame sichtbar sein soll (in ms)
+    int frame_count;
+    int width;
+    int height;
+} GifAnimation;
+
+GifAnimation anim;
+
+void dumpFrames(GifAnimation *a) {
+    printf("%d Frames, all %dx%d\n", a->frame_count, a->width, a->height);
+    for (int i=0; i < a->frame_count; i++) {
+
+        printf("Frame %d:\n", i, a->width, a->height);
+        printf("   delay=%d\n", a->delays[i]);
+        XImage * xi = a->frames[i];
+        printf("   width=%d, height=%d\n", xi->width, xi->height);
+        printf("   depth=%d\n", xi->depth);
+        printf("   data=0x%lx\n", xi->data);
+
+        printf("imageInfo:\n");
+        printf("   width=%d, height=%d\n", imageInfo.width, imageInfo.height);
+        printf("   depth=%d\n", imageInfo.depth);
+        printf("   image=0x%lx\n", imageInfo.image->data);
+    }
+}
+
 XImage *gifCanvasToImageSlow(Display *display, Visual *visual, unsigned int depth, gd_GIF *gif,
     int *w, int *h) {
     if (!gif || !gif->canvas || !gif->palette) {
@@ -134,10 +167,11 @@ XImage *gifCanvasToImageSlow(Display *display, Visual *visual, unsigned int dept
 
     // 2. Die XImage-Struktur initialisieren
     // ZPixmap sorgt dafür, dass die Pixel zeilenweise hinterlegt sind (Scanlines)
+    int screen = DefaultScreen(display);
     XImage *ximage = XCreateImage(
         display,
-        visual,
-        depth,
+        DefaultVisual(display, screen),
+        DefaultDepth(display, screen),
         ZPixmap,
         0,
         image_data,
@@ -152,13 +186,19 @@ XImage *gifCanvasToImageSlow(Display *display, Visual *visual, unsigned int dept
         return NULL;
     }
 
-    // 3. Konvertierungsschleife: Palette indizieren und Pixel für Pixel an XImage übergeben
+    // dump LUT
+    /*printf("Colortable, size %d\n", gif->palette->size);
+    for (int i = 0; i < gif->palette->size; i++) {
+        uint8_t r = gif->palette->colors[3*i];
+        uint8_t g = gif->palette->colors[3*i+1];
+        uint8_t b = gif->palette->colors[3*i+2];
+        printf("color[%d] = %d,%d,%d\n", i, r, g, b);
+    }*/
+
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            // Index des aktuellen Pixels im GIF-Canvas ermitteln
             int canvas_index = y * width + x;
             uint8_t color_idx = gif->canvas[canvas_index];
-
             // RGB-Werte aus der GIF-Palette holen
             uint8_t r = gif->palette->colors[color_idx * 3 + 0];
             uint8_t g = gif->palette->colors[color_idx * 3 + 1];
@@ -166,27 +206,14 @@ XImage *gifCanvasToImageSlow(Display *display, Visual *visual, unsigned int dept
 
             // RGB-Werte in das Pixelformat des X-Visuals/Bildschirms packen
             // Xlib verwendet oft das Format 0x00RRGGBB (oder BGR je nach System)
-            unsigned long pixel_value = 0;
-
-            if (visual->red_mask == 0) {
-                // Fallback für alte 8-Bit Pseudocolor Displays (seltener Spezialfall)
-                pixel_value = color_idx;
-            } else {
-                // Standard TrueColor Maskierung (Shift-Logik basierend auf dem X-Server-Visual)
-                // Dies stellt sicher, dass Rot, Grün und Blau im richtigen Byte landen.
-                pixel_value = ((r * visual->red_mask  / 255) & visual->red_mask)  |
-                              ((g * visual->green_mask / 255) & visual->green_mask) |
-                              ((b * visual->blue_mask / 255) & visual->blue_mask);
-            }
+            Pixel pixel = (r << 16) | (g << 8) | b;
 
             // Sicherer Xlib-Befehl, um das formatierte Pixel in den Speicher zu schreiben
-            XPutPixel(ximage, x, y, pixel_value);
+            XPutPixel(ximage, x, y, pixel);
         }
     }
-
     return ximage;
 }
-
 
 
 /**
@@ -205,6 +232,9 @@ void handleGeometryChanges(Widget button) {
     Dimension new_h = prefered.height;
     //printf("new_w=%d, new_h=%d\n", new_w, new_h);
 
+    //dumpFrames(&anim);
+    //printf("src width=%d, height=%d\n", src_ximage->width, src_ximage->height);
+    //printf("img width=%d, height=%d\n", imageInfo.image->width, imageInfo.image->height);
     Pixmap temp_pixmap = XCreatePixmap(dpy, win,
                                        src_ximage->width, src_ximage->height,
                                        src_ximage->depth);
@@ -257,7 +287,7 @@ void resizeCallback(Widget button, XtPointer xt_pointer, XtPointer xt_pointer1) 
     //XtVaSetValues(XtParent(button), XmNallowShellResize, True, NULL);
 }
 
-XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
+XImage *load_gif_to_ximageOLD(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
     int *w, int *h) {
     // GIF-Datei öffnen
     printf("Open file %s\n", filename);
@@ -271,16 +301,16 @@ XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, con
 
     // Loop durch alle Frames der Animation
     int frame_count = 0;
-    int end=0;
     XImage *image = NULL;
-    while (gd_get_frame(gif) && !end) {
+    while (gd_get_frame(gif)) {
         frame_count++;
-        end=1;
+        //gif->frame
         // gif->canvas enthält jetzt die rohen Pixeldaten des aktuellen Frames
-        image = gifCanvasToImageSlow(dpy, visual, depth, gif, w, h);
-        if (image == NULL) {
-            printf("Image cannot be created from file\n");
-        }
+
+    }
+    image = gifCanvasToImageSlow(dpy, visual, depth, gif, w, h);
+    if (image == NULL) {
+        printf("Image cannot be created from file\n");
     }
     printf("Anzahl der Frames: %d\n", frame_count);
 
@@ -288,6 +318,46 @@ XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, con
     gd_close_gif(gif);
 
     return image;
+}
+
+int maxframes = 0;
+int currentframe = 0;
+
+XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
+    int *w, int *h) {
+    gd_GIF *gif = gd_open_gif(filename);
+    if (!gif) return NULL;
+
+    anim.width = gif->width;
+    anim.height = gif->height;
+    *w = gif->width;
+    *h = gif->height;
+    anim.frame_count = 0;
+
+    // Schleife läuft durch alle Frames
+    while (gd_get_frame(gif) && anim.frame_count < MAX_FRAMES) {
+        // 1. Konvertiere das aktuelle Canvas in ein XImage und speichere es im Array
+        anim.frames[anim.frame_count] = gifCanvasToImageSlow(dpy, visual, depth, gif, &anim.width, &anim.height);
+
+        // 2. Speicher die Frame-Verzögerung (gif->gce.delay ist in Hundertstelsekunden, daher * 10 für Millisekunden)
+        anim.delays[anim.frame_count] = gif->gce.delay * 10;
+        printf("Frame %d, delay=%d\n", anim.frame_count, anim.delays[anim.frame_count]);
+
+        anim.frame_count++;
+    }
+    maxframes = anim.frame_count;
+    printf("maxframes: %d\n", maxframes);
+
+
+    gd_close_gif(gif);
+    //dumpFrames(&anim);
+    // Gibt zum Beispiel den ersten Frame als Startbild zurück
+    imageInfo.image = anim.frames[0];
+    imageInfo.width = anim.width;
+    imageInfo.height = anim.height;
+    imageInfo.depth = anim.frames[currentframe]->depth;
+
+    return anim.frames[0];
 }
 
 Widget createPixmapCanvas(Widget parent, char *fileName) {
@@ -312,13 +382,30 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
 }
 
 static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
-    //printf("TimeoutCB\n");
+    //printf("TimeoutCB, currentframe=%d\n", currentframe);
+
     //XtVaSetValues(XtParent(imageInfo.canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
     //handleGeometryChanges(imageInfo.canvas);
+
+    //XDestroyImage(imageInfo.image);
+    imageInfo.image = anim.frames[currentframe];
+    imageInfo.width = anim.width;
+    imageInfo.height = anim.height;
+    imageInfo.depth = anim.frames[currentframe]->depth;
+    timeout = anim.delays[currentframe];
+
+    currentframe++;
+    if (currentframe == maxframes) {
+        currentframe = 0;
+    }
+
+    XtVaSetValues(XtParent(imageInfo.canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
+    handleGeometryChanges(imageInfo.canvas);
+
     /*
      * start time out from the beginning
      */
-    XtAppAddTimeOut( imageInfo.app, TIMEOUT_NOSECONDS, TimeoutCB, NULL );
+    XtAppAddTimeOut( imageInfo.app, timeout, TimeoutCB, NULL );
 }
 
 int main( int argc, char **argv ) {
@@ -330,12 +417,14 @@ int main( int argc, char **argv ) {
     imageInfo.app = app;
     imageInfo.shell = shell;
 
+    imageInfo.valid = 0;
     //char *file = "test-images/dilbert.gif";
     char *file = "test-images/halbes_pferd.gif";
     if (argc > 1) {
         file = argv[1];
     }
     canvas = createPixmapCanvas(shell, file);
+    imageInfo.valid = 1;
 
     XtRealizeWidget ( shell );
 
