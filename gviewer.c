@@ -26,10 +26,22 @@ typedef struct {
     Widget canvas;
     XtAppContext app;
     char *dirPath;
-    int valid;
 } ImageInfo;
-#
+
 ImageInfo imageInfo;
+
+
+#define MAX_FRAMES 500
+
+typedef struct {
+    XImage *frames[MAX_FRAMES];
+    int delays[MAX_FRAMES]; // Speichert, wie lange jeder Frame sichtbar sein soll (in ms)
+    int frame_count;
+    int width;
+    int height;
+} GifAnimation;
+
+GifAnimation anim;
 
 int endsWith(const char *str, const char *suffix) {
     size_t len_str = strlen(str);
@@ -43,90 +55,6 @@ int endsWith(const char *str, const char *suffix) {
     // Setze den Zeiger an die Position, wo das Suffix im Hauptstring beginnen müsste
     return strcmp(str + (len_str - len_suffix), suffix) == 0;
 }
-
-XImage *gifCanvasToImageFast2(Display *display, Visual *visual, unsigned int depth, gd_GIF *gif,
-    int *w, int *h) {
-    if (!gif || !gif->canvas || !gif->palette) {
-        // Falls das Display kein 32-Bit nutzt, müsste man Fallbacks einbauen.
-        // 32-Bit (ZPixmap) ist auf modernen Linux/X11 Systemen der absolute Standard.
-        return NULL;
-    }
-    if (depth != 32 || depth != 24) {
-        printf("gifCanvasToImageFast: depth must be 32 bits, but is %d\n", depth);
-    }
-
-    int width = gif->width;
-    int height = gif->height;
-    *w = width;
-    *h = height;
-
-    // 1. Speicher für das XImage allokieren (4 Bytes pro Pixel bei 32-Bit)
-    uint32_t *image_data = (uint32_t *)malloc(width * height * sizeof(uint32_t));
-    if (!image_data) return NULL;
-
-    XImage *ximage = XCreateImage(
-        display, visual, depth, ZPixmap, 0,
-        (char *)image_data, width, height, 32, 0
-    );
-
-    if (!ximage) {
-        free(image_data);
-        return NULL;
-    }
-
-    // 2. OPTIMIERUNG: Lookup-Table (LUT) für die Palette vorberechnen
-    // Ein GIF hat maximal 256 Farben. Wir wandeln diese 256 RGB-Werte vorab
-    // in das exakte Bit-Format des X-Servers um.
-    uint32_t color_lut[256];
-    int num_colors = gif->palette->size;
-
-    for (int i = 0; i < num_colors; i++) {
-        uint8_t r = gif->palette->colors[i * 3 + 0];
-        uint8_t g = gif->palette->colors[i * 3 + 1];
-        uint8_t b = gif->palette->colors[i * 3 + 2];
-
-        // Bit-Shifts basierend auf den Masken des X-Visuals einmalig berechnen
-        color_lut[i] = ((r * visual->red_mask  / 255) & visual->red_mask)  |
-                       ((g * visual->green_mask / 255) & visual->green_mask) |
-                       ((b * visual->blue_mask / 255) & visual->blue_mask);
-    }
-
-    // 3. OPTIMIERUNG: Direkter Speicherzugriff ohne XPutPixel
-    // Wir nutzen flache Zeiger und überlassen der CPU sequenzielle Speicherzugriffe.
-    uint8_t *src = gif->canvas;
-    uint32_t *dst = image_data;
-    int total_pixels = width * height;
-
-    // Diese Schleife lässt sich vom Clang-Compiler extrem gut per SIMD (Auto-Vektorisierung) optimieren
-    for (int i = 0; i < total_pixels; i++) {
-        dst[i] = color_lut[src[i]];
-    }
-
-    return ximage;
-}
-
-// Hilfsfunktion zur Ermittlung des Bit-Shifts aus einer X11-Maske
-static int get_shift(unsigned long mask) {
-    if (mask == 0) return 0;
-    int shift = 0;
-    while ((mask & 1) == 0) {
-        mask >>= 1;
-        shift++;
-    }
-    return shift;
-}
-
-#define MAX_FRAMES 500
-
-typedef struct {
-    XImage *frames[MAX_FRAMES];
-    int delays[MAX_FRAMES]; // Speichert, wie lange jeder Frame sichtbar sein soll (in ms)
-    int frame_count;
-    int width;
-    int height;
-} GifAnimation;
-
-GifAnimation anim;
 
 void dumpFrames(GifAnimation *a) {
     printf("%d Frames, all %dx%d\n", a->frame_count, a->width, a->height);
@@ -142,7 +70,9 @@ void dumpFrames(GifAnimation *a) {
         printf("imageInfo:\n");
         printf("   width=%d, height=%d\n", imageInfo.width, imageInfo.height);
         printf("   depth=%d\n", imageInfo.depth);
-        printf("   image=0x%lx\n", imageInfo.image->data);
+        if (imageInfo.image != NULL) {
+            printf("   image=0x%lx\n", imageInfo.image->data);
+        }
     }
 }
 
@@ -332,12 +262,13 @@ XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, con
     printf("maxframes: %d\n", maxframes);
 
     gd_close_gif(gif);
-    //dumpFrames(&anim);
+    dumpFrames(&anim);
     // Gibt zum Beispiel den ersten Frame als Startbild zurück
     imageInfo.image = anim.frames[0];
     imageInfo.width = anim.width;
     imageInfo.height = anim.height;
     imageInfo.depth = anim.frames[currentframe]->depth;
+    currentframe=0;
 
     return anim.frames[0];
 }
@@ -380,6 +311,7 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     if (currentframe == maxframes) {
         currentframe = 0;
     }
+    currentframe=0;
 
     XtVaSetValues(XtParent(imageInfo.canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
     handleGeometryChanges(imageInfo.canvas);
@@ -399,14 +331,12 @@ int main( int argc, char **argv ) {
     imageInfo.app = app;
     imageInfo.shell = shell;
 
-    imageInfo.valid = 0;
     //char *file = "test-images/dilbert.gif";
     char *file = "test-images/halbes_pferd.gif";
     if (argc > 1) {
         file = argv[1];
     }
     canvas = createPixmapCanvas(shell, file);
-    imageInfo.valid = 1;
 
     XtRealizeWidget ( shell );
 
