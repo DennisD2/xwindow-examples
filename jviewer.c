@@ -43,7 +43,7 @@ char *filenames[10000];
 int maximage = 0;
 int current = 0;
 
-Widget createPixmapCanvas (Widget parent, char *pngFile);
+Widget createPixmapCanvas (Widget parent, char *fileName);
 
 void readpng_version_info() {
     fprintf(stderr, "   Compiled with libpng %s; using libpng %s.\n",
@@ -334,7 +334,7 @@ int endsWith(const char *str, const char *suffix) {
     return strcmp(str + (len_str - len_suffix), suffix) == 0;
 }
 
-Widget createPixmapCanvas(Widget parent, char *pngFile) {
+Widget createPixmapCanvas(Widget parent, char *fileName) {
     Widget canvas;
     Display *dpy = XtDisplay(parent);
 
@@ -349,13 +349,13 @@ Widget createPixmapCanvas(Widget parent, char *pngFile) {
     int screen = DefaultScreen(dpy);
     imageInfo.depth = DefaultDepth(dpy, screen);
 
-    if (endsWith(pngFile, ".png")) {
-        createImageFromFile(imageInfo.shell, pngFile, &data, png_bytes, &(imageInfo.image));
+    if (endsWith(fileName, ".png")) {
+        createImageFromFile(imageInfo.shell, fileName, &data, png_bytes, &(imageInfo.image));
     }
-    if (endsWith(pngFile, ".jpg")) {
+    if (endsWith(fileName, ".jpg")) {
         Display *dpy = XtDisplay(imageInfo.shell);
         Visual *v = DefaultVisual(dpy, DefaultScreen(dpy));
-        imageInfo.image = load_jpeg_to_ximage(dpy, v, imageInfo.depth, pngFile,
+        imageInfo.image = load_jpeg_to_ximage(dpy, v, imageInfo.depth, fileName,
             &(imageInfo.width), &(imageInfo.height));
     }
     return canvas;
