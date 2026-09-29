@@ -9,6 +9,7 @@
 
 #include <Xm/Xm.h>
 #include <Xm/DrawingA.h>
+#include <Xm/MainW.h>
 #include <X11/xpm.h>
 #include <X11/Intrinsic.h>
 #include <X11/extensions/Xrender.h>
@@ -119,19 +120,25 @@ XImage *gifCanvasToImage(Display *display, Visual *visual,
 
 /**
  * Handles geometry changes. uses XRender extension for fast scaling.
- * @param button widget with geometry changed
+ * @param canvas widget with geometry changed
  */
-void handleGeometryChanges(Widget button) {
-    Display *dpy = XtDisplay(button);
-    Window win = XtWindow(button);
+void handleGeometryChanges(Widget canvas) {
+    Display *dpy = XtDisplay(canvas);
+    Window win = XtWindow(canvas);
     XImage *src_ximage = imageInfo.image;
 
     // Get new geometry
     XtWidgetGeometry intended,prefered;
-    XtQueryGeometry(XtParent(button), &intended, &prefered);
+    XtQueryGeometry(XtParent(canvas), &intended, &prefered);
     Dimension new_w = prefered.width;
     Dimension new_h = prefered.height;
     //printf("new_w=%d, new_h=%d\n", new_w, new_h);
+
+    // Prevent X errors as long as there is no physical window mapped
+    if (win == 0) {
+        printf("waiting for window becoming mapped...\n");
+        return;
+    }
 
     Pixmap temp_pixmap = XCreatePixmap(dpy, win,
                                        src_ximage->width, src_ximage->height,
@@ -171,20 +178,16 @@ void handleGeometryChanges(Widget button) {
     XFreePixmap(dpy, temp_pixmap); // Die temporäre Pixmap kann wieder weg
 }
 
-void exposeCallback(Widget button, XtPointer xt_pointer, XtPointer xt_pointer1) {
+void exposeCallback(Widget canvas, XtPointer xt_pointer, XtPointer xt_pointer1) {
     //printf("exposeCallback()\n");
-    handleGeometryChanges(button);
-    XtVaSetValues(XtParent(button), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
+    handleGeometryChanges(canvas);
+    //XtVaSetValues(imageInfo.shell, XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
 }
 
-void resizeCallback(Widget button, XtPointer xt_pointer, XtPointer xt_pointer1) {
+void resizeCallback(Widget canvas, XtPointer xt_pointer, XtPointer xt_pointer1) {
     //printf("resizeCallback()\n");
-    handleGeometryChanges(button);
-    //XtVaSetValues(XtParent(button), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
-    //XtVaSetValues(button, XmNresizePolicy, XmRESIZE_NONE, NULL);
-    //XtVaSetValues(XtParent(button), XmNallowShellResize, True, NULL);
+    handleGeometryChanges(canvas);
 }
-
 
 XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
     int *w, int *h) {
@@ -271,12 +274,16 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
 }
 
 int main( int argc, char **argv ) {
-    Widget       canvas, shell;
     XtAppContext app;
 
-    shell = XtAppInitialize ( &app, "XPmlogo", NULL, 0,
+    Widget shell = XtAppInitialize ( &app, "XPmlogo", NULL, 0,
                               &argc, argv, NULL, NULL, 0  );
     imageInfo.app = app;
+
+    Widget mainWindow = XtCreateManagedWidget ( "mainWindow",
+                                         xmMainWindowWidgetClass,
+                                         shell, NULL, 0 );
+    XtVaSetValues(mainWindow, XmNwidth, 1000, XmNheight, 500, NULL);
     imageInfo.shell = shell;
 
     char *file = "test-images/halbes_pferd.gif";
@@ -285,7 +292,7 @@ int main( int argc, char **argv ) {
     }
 
     anim.currentframe = 0;
-    canvas = createPixmapCanvas(shell, file);
+    Widget canvas = createPixmapCanvas(mainWindow, file);
 
     XtRealizeWidget ( shell );
 
