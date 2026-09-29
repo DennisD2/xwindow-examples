@@ -23,8 +23,8 @@ Uses libjpeg for loading JPEG file.
 
 ### gviewer.c
 Display GIF files, animated and non-animated. Uses gifdec-Implementation
-to decode GIF format. 
+to decode GIF format. Cannot load GIFs without global color table.
 
 ## Related
 * gifdec code for decoding GIF files - https://github.com/lecram/gifdec.
-  Cannot load GIFs without global color table. 
+ 
