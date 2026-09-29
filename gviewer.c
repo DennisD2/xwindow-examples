@@ -41,7 +41,7 @@ int endsWith(const char *str, const char *suffix) {
     return strcmp(str + (len_str - len_suffix), suffix) == 0;
 }
 
-XImage *gifCanvasToImageFast(Display *display, Visual *visual, unsigned int depth, gd_GIF *gif,
+XImage *gifCanvasToImageFast2(Display *display, Visual *visual, unsigned int depth, gd_GIF *gif,
     int *w, int *h) {
     if (!gif || !gif->canvas || !gif->palette) {
         // Falls das Display kein 32-Bit nutzt, müsste man Fallbacks einbauen.
@@ -101,6 +101,93 @@ XImage *gifCanvasToImageFast(Display *display, Visual *visual, unsigned int dept
 
     return ximage;
 }
+
+// Hilfsfunktion zur Ermittlung des Bit-Shifts aus einer X11-Maske
+static int get_shift(unsigned long mask) {
+    if (mask == 0) return 0;
+    int shift = 0;
+    while ((mask & 1) == 0) {
+        mask >>= 1;
+        shift++;
+    }
+    return shift;
+}
+
+XImage *gifCanvasToImageSlow(Display *display, Visual *visual, unsigned int depth, gd_GIF *gif,
+    int *w, int *h) {
+    if (!gif || !gif->canvas || !gif->palette) {
+        return NULL;
+    }
+
+    int width = gif->width;
+    int height = gif->height;
+    *w = width;
+    *h = height;
+
+    // 1. Speicher für die rohen Bilddaten des XImage reservieren (z. B. 4 Bytes pro Pixel bei 32-Bit Tiefe)
+    // Bei TrueColor/ZPixmap wird empfohlen, den Puffer dynamisch zu erzeugen.
+    int bytes_per_pixel = (depth <= 8) ? 1 : ((depth <= 16) ? 2 : 4);
+    char *image_data = malloc(width * height * bytes_per_pixel);
+    if (!image_data) {
+        return NULL;
+    }
+
+    // 2. Die XImage-Struktur initialisieren
+    // ZPixmap sorgt dafür, dass die Pixel zeilenweise hinterlegt sind (Scanlines)
+    XImage *ximage = XCreateImage(
+        display,
+        visual,
+        depth,
+        ZPixmap,
+        0,
+        image_data,
+        width,
+        height,
+        32,       // Bitmap-Padding (üblich sind 32 Bit)
+        0         // bytes_per_line auf 0 setzen: Xlib berechnet es automatisch
+    );
+
+    if (!ximage) {
+        free(image_data);
+        return NULL;
+    }
+
+    // 3. Konvertierungsschleife: Palette indizieren und Pixel für Pixel an XImage übergeben
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            // Index des aktuellen Pixels im GIF-Canvas ermitteln
+            int canvas_index = y * width + x;
+            uint8_t color_idx = gif->canvas[canvas_index];
+
+            // RGB-Werte aus der GIF-Palette holen
+            uint8_t r = gif->palette->colors[color_idx * 3 + 0];
+            uint8_t g = gif->palette->colors[color_idx * 3 + 1];
+            uint8_t b = gif->palette->colors[color_idx * 3 + 2];
+
+            // RGB-Werte in das Pixelformat des X-Visuals/Bildschirms packen
+            // Xlib verwendet oft das Format 0x00RRGGBB (oder BGR je nach System)
+            unsigned long pixel_value = 0;
+
+            if (visual->red_mask == 0) {
+                // Fallback für alte 8-Bit Pseudocolor Displays (seltener Spezialfall)
+                pixel_value = color_idx;
+            } else {
+                // Standard TrueColor Maskierung (Shift-Logik basierend auf dem X-Server-Visual)
+                // Dies stellt sicher, dass Rot, Grün und Blau im richtigen Byte landen.
+                pixel_value = ((r * visual->red_mask  / 255) & visual->red_mask)  |
+                              ((g * visual->green_mask / 255) & visual->green_mask) |
+                              ((b * visual->blue_mask / 255) & visual->blue_mask);
+            }
+
+            // Sicherer Xlib-Befehl, um das formatierte Pixel in den Speicher zu schreiben
+            XPutPixel(ximage, x, y, pixel_value);
+        }
+    }
+
+    return ximage;
+}
+
+
 
 /**
  * Handles geometry changes. uses XRender extension for fast scaling.
@@ -190,7 +277,7 @@ XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, con
         frame_count++;
         end=1;
         // gif->canvas enthält jetzt die rohen Pixeldaten des aktuellen Frames
-        image = gifCanvasToImageFast(dpy, visual, depth, gif, w, h);
+        image = gifCanvasToImageSlow(dpy, visual, depth, gif, w, h);
         if (image == NULL) {
             printf("Image cannot be created from file\n");
         }
@@ -245,6 +332,9 @@ int main( int argc, char **argv ) {
 
     //char *file = "test-images/dilbert.gif";
     char *file = "test-images/halbes_pferd.gif";
+    if (argc > 1) {
+        file = argv[1];
+    }
     canvas = createPixmapCanvas(shell, file);
 
     XtRealizeWidget ( shell );
