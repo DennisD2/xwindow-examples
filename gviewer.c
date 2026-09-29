@@ -13,23 +13,20 @@
 #include <X11/Intrinsic.h>
 #include <X11/extensions/Xrender.h>
 
-#define TIMEOUT_NOSECONDS 200L
-int timeout = TIMEOUT_NOSECONDS;
+#define DEF_TIMEOUT_NOSECONDS 200L
+int timeout = DEF_TIMEOUT_NOSECONDS;
 
 typedef struct {
     XImage *image;
     int width;
     int height;
-    GC gc;
     unsigned int depth;
     Widget shell;
     Widget canvas;
     XtAppContext app;
-    char *dirPath;
 } ImageInfo;
 
 ImageInfo imageInfo;
-
 
 #define MAX_FRAMES 500
 
@@ -47,12 +44,9 @@ int endsWith(const char *str, const char *suffix) {
     size_t len_str = strlen(str);
     size_t len_suffix = strlen(suffix);
 
-    // Wenn das Suffix länger ist als der String, kann es nicht passen
     if (len_suffix > len_str) {
         return false;
     }
-
-    // Setze den Zeiger an die Position, wo das Suffix im Hauptstring beginnen müsste
     return strcmp(str + (len_str - len_suffix), suffix) == 0;
 }
 
@@ -67,16 +61,17 @@ void dumpFrames(GifAnimation *a) {
         printf("   depth=%d\n", xi->depth);
         printf("   data=0x%lx\n", xi->data);
 
-        printf("imageInfo:\n");
-        printf("   width=%d, height=%d\n", imageInfo.width, imageInfo.height);
-        printf("   depth=%d\n", imageInfo.depth);
-        if (imageInfo.image != NULL) {
-            printf("   image=0x%lx\n", imageInfo.image->data);
-        }
+        //printf("imageInfo:\n");
+        //printf("   width=%d, height=%d\n", imageInfo.width, imageInfo.height);
+        //printf("   depth=%d\n", imageInfo.depth);
+        //if (imageInfo.image != NULL) {
+        //    printf("   image=0x%lx\n", imageInfo.image->data);
+        //}
     }
 }
 
-XImage *gifCanvasToImageSlow(Display *display, Visual *visual, unsigned int depth, gd_GIF *gif,
+XImage *gifCanvasToImageSlow(Display *display, Visual *visual,
+    gd_GIF *gif , uint8_t *rgbBuffer, unsigned int depth,
     int *w, int *h) {
     if (!gif || !gif->canvas || !gif->palette) {
         return NULL;
@@ -100,7 +95,7 @@ XImage *gifCanvasToImageSlow(Display *display, Visual *visual, unsigned int dept
     int screen = DefaultScreen(display);
     XImage *ximage = XCreateImage(
         display,
-        DefaultVisual(display, screen),
+        visual,
         DefaultDepth(display, screen),
         ZPixmap,
         0,
@@ -119,9 +114,10 @@ XImage *gifCanvasToImageSlow(Display *display, Visual *visual, unsigned int dept
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             int canvas_index = 3*(y * width + x);
-            uint8_t r = gif->canvas[canvas_index+0];
-            uint8_t g = gif->canvas[canvas_index+1];
-            uint8_t b = gif->canvas[canvas_index+2];
+            //uint8_t r = gif->canvas[canvas_index+0];
+            uint8_t r = rgbBuffer[canvas_index+0];
+            uint8_t g = rgbBuffer[canvas_index+1];
+            uint8_t b = rgbBuffer[canvas_index+2];
             Pixel pixel = (r<<16)|(g<<8)|b;
             XPutPixel(ximage, x, y, pixel);
         }
@@ -200,39 +196,6 @@ void resizeCallback(Widget button, XtPointer xt_pointer, XtPointer xt_pointer1) 
     //XtVaSetValues(XtParent(button), XmNallowShellResize, True, NULL);
 }
 
-XImage *load_gif_to_ximageOLD(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
-    int *w, int *h) {
-    // GIF-Datei öffnen
-    printf("Open file %s\n", filename);
-    gd_GIF *gif = gd_open_gif(filename);
-    if (!gif) {
-        printf("Fehler beim Öffnen der Datei %s.\n", filename);
-        return NULL;
-    }
-
-    printf("Breite: %dpx, Höhe: %dpx\n", gif->width, gif->height);
-
-    // Loop durch alle Frames der Animation
-    int frame_count = 0;
-    XImage *image = NULL;
-    while (gd_get_frame(gif)) {
-        frame_count++;
-        //gif->frame
-        // gif->canvas enthält jetzt die rohen Pixeldaten des aktuellen Frames
-
-    }
-    image = gifCanvasToImageSlow(dpy, visual, depth, gif, w, h);
-    if (image == NULL) {
-        printf("Image cannot be created from file\n");
-    }
-    printf("Anzahl der Frames: %d\n", frame_count);
-
-    // Speicher freigeben
-    gd_close_gif(gif);
-
-    return image;
-}
-
 int maxframes = 0;
 int currentframe = 0;
 
@@ -249,8 +212,11 @@ XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, con
 
     // Schleife läuft durch alle Frames
     while (gd_get_frame(gif) && anim.frame_count < MAX_FRAMES) {
+        uint8_t *rgbBuffer = malloc(anim.width * anim.height * 4);
+        gd_render_frame(gif, rgbBuffer);
+
         // 1. Konvertiere das aktuelle Canvas in ein XImage und speichere es im Array
-        anim.frames[anim.frame_count] = gifCanvasToImageSlow(dpy, visual, depth, gif, &anim.width, &anim.height);
+        anim.frames[anim.frame_count] = gifCanvasToImageSlow(dpy, visual, gif, rgbBuffer, depth, &anim.width, &anim.height);
 
         // 2. Speicher die Frame-Verzögerung (gif->gce.delay ist in Hundertstelsekunden, daher * 10 für Millisekunden)
         anim.delays[anim.frame_count] = gif->gce.delay * 10;
@@ -259,7 +225,6 @@ XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, con
         anim.frame_count++;
     }
     maxframes = anim.frame_count;
-    printf("maxframes: %d\n", maxframes);
 
     gd_close_gif(gif);
     dumpFrames(&anim);
@@ -311,7 +276,6 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     if (currentframe == maxframes) {
         currentframe = 0;
     }
-    currentframe=0;
 
     XtVaSetValues(XtParent(imageInfo.canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
     handleGeometryChanges(imageInfo.canvas);
