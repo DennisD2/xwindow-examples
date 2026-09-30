@@ -400,35 +400,43 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
 static void canvasKeyEventHandler(Widget widget, XtPointer clientData, XEvent * event, Boolean * flag) {
     //printf("canvasKeyEventHandler\n");
     XKeyEvent *ke = (XKeyEvent *) event;
-    int c;
+    /*int c;
     XID ks = XKeycodeToKeysym(XtDisplay(appInfo.shell), ke->keycode, c);
     printf("key '%c'\n", (char)ks);
     if (ks == 'q') {
         exit(0);
     }
-    if ((char)ks==' ') {
-        if (appInfo.state == S_NORMAL) {
-            appInfo.state = S_PAUSE;
-            printf("paused\n");
-        } else {
-            appInfo.state = S_NORMAL;
-            printf("normal\n");
+*/
+    char buffer[16];
+    KeySym keysym;
+    int num_chars = XLookupString(&event->xkey, buffer, sizeof(buffer) - 1, &keysym, NULL);
+    if (num_chars > 0) {
+        buffer[num_chars] = '\0';
+        char ks = buffer[0];
+        if ((char)ks==' ') {
+            if (appInfo.state == S_NORMAL) {
+                appInfo.state = S_PAUSE;
+                printf("paused\n");
+            } else {
+                appInfo.state = S_NORMAL;
+                printf("normal\n");
+            }
         }
-    }
-
-    if ((char)ks=='Q') {
-        current--;
-        if (current<0) {
-            current=0;
+    } else {
+        if (keysym == XK_Left) {
+            current--;
+            if (current<0) {
+                current=0;
+            }
+            printf("current=%d\n", current);
         }
-        printf("current=%d\n", current);
-    }
-    if ((char)ks=='S') {
-        current++;
-        if (current==maximage) {
-            current=0;
+        if (keysym == XK_Right) {
+            current++;
+            if (current==maximage) {
+                current=0;
+            }
+            printf("current=%d\n", current);
         }
-        printf("current=%d\n", current);
     }
 }
 
