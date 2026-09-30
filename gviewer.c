@@ -306,7 +306,7 @@ static void canvasKeyEventHandler(Widget widget, XtPointer clientData, XEvent * 
     if (num_chars > 0) {
         buffer[num_chars] = '\0';
         char ks = buffer[0];
-        if ((char)ks==' ') {
+        if (ks==' ') {
             if (appInfo.state == S_NORMAL) {
                 appInfo.state = S_PAUSE;
                 printf("paused\n");
@@ -314,6 +314,9 @@ static void canvasKeyEventHandler(Widget widget, XtPointer clientData, XEvent * 
                 appInfo.state = S_NORMAL;
                 printf("normal\n");
             }
+        }
+        if (ks=='q' || ks=='x') {
+            exit(0);
         }
     } else {
         // currently empty
