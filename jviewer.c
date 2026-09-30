@@ -254,6 +254,11 @@ void handleGeometryChanges(Widget canvas) {
         return;
     }
 
+    if (src_ximage == NULL) {
+        printf("no ximage was created, ignoring...\n");
+        return;
+    }
+
     Pixmap temp_pixmap = XCreatePixmap(dpy, win,
                                        src_ximage->width, src_ximage->height,
                                        src_ximage->depth);
@@ -372,7 +377,9 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
         appInfo.current=0;
     }
 
-    XDestroyImage(imageInfo.image);
+    if (imageInfo.image != NULL) {
+        XDestroyImage(imageInfo.image);
+    }
 
     if (endsWith(file, ".png")) {
         int png_bytes;
@@ -445,7 +452,7 @@ void main( int argc, char **argv ) {
     if (argc == 3) {
         startIndex = atoi(argv[2]);
     }
-    printf("basedir=%s, startIndex = %d\n", baseDir, startIndex);
+    printf("basedir=%s, startIndex=%d\n", baseDir, startIndex);
 
     readpng_version_info();
 
@@ -455,7 +462,6 @@ void main( int argc, char **argv ) {
     appInfo.shell = shell;
     appInfo.imageTimeout = TIMEOUT_MSECONDS;
     appInfo.maximage = 0;
-    appInfo.current = 0;
 
     DIR *dir;
     struct dirent *entry;
