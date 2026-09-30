@@ -1,4 +1,12 @@
-
+/********************************************************************
+* This example shows how to load a GIF file and use it as a pixmap. Uses libXrender.
+ * The code loads the GIF file with 1..MAX_FRAMES frames (if animated GIF),
+ * creates according number of XIMage definitions.
+ * Then animation is started by displaying all frames loaded in a loop.
+ * Each frames XImage is used to set the pixmap in a Canvas widget.
+ * Because XRender extension is used for scaling and an XImage structure is used,
+ * the rendering is *very* fast.
+ * ******************************************************************/
 #include <stdio.h>
 #include "gifdec.h"
 
