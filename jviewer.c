@@ -23,7 +23,7 @@
 
 #include <dirent.h>
 
-#define TIMEOUT_NOSECONDS 10000L
+#define TIMEOUT_MSECONDS 10000L
 
 #define S_NORMAL 0
 #define S_PAUSE 1
@@ -42,14 +42,15 @@ typedef struct {
     Widget canvas;
     XtAppContext app;
     char *dirPath;
+    int imageTimeout;
     int state;
+    char *filenames[10000];
+    int maximage;
+    int current;
 } AppInfo;
 
 AppInfo appInfo;
 
-char *filenames[10000];
-int maximage = 0;
-int current = 0;
 
 Widget createPixmapCanvas (Widget parent, char *fileName);
 
@@ -81,7 +82,7 @@ XImage* load_jpeg_to_ximage(Display *dpy, Visual *visual, unsigned int depth, co
     // Open file
     char fn[128];
     sprintf(fn,"%s/%s", appInfo.dirPath, filename);
-    printf("Open file %d: %s\n", current, fn);
+    printf("Open file %d: %s\n", appInfo.current, fn);
     if ((infile = fopen(fn, "rb")) == NULL) {
         fprintf(stderr, "Error opening %sn", filename);
         return NULL;
@@ -291,7 +292,7 @@ bool loadPngFromFile(char *pngFile, unsigned char **data, int *png_bytes) {
     // Open PNG file
     char fn[128];
     sprintf(fn,"%s/%s", appInfo.dirPath, pngFile);
-    printf("Open file %d: %s\n", current, fn);
+    printf("Open file %d: %s\n", appInfo.current, fn);
     FILE *fp = fopen(fn, "rb");
     if (!fp) {
         fprintf(stderr, "Error opening file\n");
@@ -368,14 +369,14 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     //printf("TimeoutCB\n");
 
     if (appInfo.state == S_PAUSE) {
-        XtAppAddTimeOut( appInfo.app, TIMEOUT_NOSECONDS, TimeoutCB, NULL );
+        XtAppAddTimeOut( appInfo.app, appInfo.imageTimeout, TimeoutCB, NULL );
         return;
     }
 
-    char *file = filenames[current];
-    current++;
-    if (current==maximage) {
-        current=0;
+    char *file = appInfo.filenames[appInfo.current];
+    appInfo.current++;
+    if (appInfo.current==appInfo.maximage) {
+        appInfo.current=0;
     }
     XDestroyImage(imageInfo.image);
     unsigned char *data;
@@ -394,7 +395,7 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     /*
      * start time out from the beginning
      */
-    XtAppAddTimeOut( appInfo.app, TIMEOUT_NOSECONDS, TimeoutCB, NULL );
+    XtAppAddTimeOut( appInfo.app, appInfo.imageTimeout, TimeoutCB, NULL );
 }
 
 static void canvasKeyEventHandler(Widget widget, XtPointer clientData, XEvent * event, Boolean * flag) {
@@ -420,18 +421,18 @@ static void canvasKeyEventHandler(Widget widget, XtPointer clientData, XEvent * 
         }
     } else {
         if (keysym == XK_Left) {
-            current--;
-            if (current<0) {
-                current=0;
+            appInfo.current--;
+            if (appInfo.current<0) {
+                appInfo.current=0;
             }
-            printf("current=%d\n", current);
+            printf("current=%d\n", appInfo.current);
         }
         if (keysym == XK_Right) {
-            current++;
-            if (current==maximage) {
-                current=0;
+            appInfo.current++;
+            if (appInfo.current==appInfo.maximage) {
+                appInfo.current=0;
             }
-            printf("current=%d\n", current);
+            printf("current=%d\n", appInfo.current);
         }
     }
 }
@@ -457,6 +458,9 @@ void main( int argc, char **argv ) {
                               &argc, argv, NULL, NULL, 0  );
     appInfo.app = app;
     appInfo.shell = shell;
+    appInfo.imageTimeout = TIMEOUT_MSECONDS;
+    appInfo.maximage = 0;
+    appInfo.current = 0;
 
     DIR *dir;
     struct dirent *entry;
@@ -471,23 +475,23 @@ void main( int argc, char **argv ) {
         char  *name = entry->d_name;
         if (endsWith(name, ".png") || endsWith(name, ".jpg")) {
             //printf("- %s\n", entry->d_name);
-            filenames[maximage] = malloc(strlen(name)+1);
-            strcpy(filenames[maximage], name);
-            maximage++;
+            appInfo.filenames[appInfo.maximage] = malloc(strlen(name)+1);
+            strcpy(appInfo.filenames[appInfo.maximage], name);
+            appInfo.maximage++;
         }
     }
     closedir(dir);
 
-    if (startIndex >= maximage) {
-        printf("Start index %d larger than number of images %d, ignoring.\n", startIndex, maximage);
+    if (startIndex >= appInfo.maximage) {
+        printf("Start index %d larger than number of images %d, ignoring.\n", startIndex, appInfo.maximage);
     }
-    current = startIndex;
+    appInfo.current = startIndex;
 
-    canvas = createPixmapCanvas( shell,  filenames[0] );
+    canvas = createPixmapCanvas( shell,  appInfo.filenames[0] );
     XtAddEventHandler ( canvas, KeyPressMask, FALSE,
             canvasKeyEventHandler, NULL );
 
-    printf("Number of files: %d\n", maximage);
+    printf("Number of files: %d\n", appInfo.maximage);
 
     XtRealizeWidget ( shell );
 
