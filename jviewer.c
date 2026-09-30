@@ -400,13 +400,6 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
 static void canvasKeyEventHandler(Widget widget, XtPointer clientData, XEvent * event, Boolean * flag) {
     //printf("canvasKeyEventHandler\n");
     XKeyEvent *ke = (XKeyEvent *) event;
-    /*int c;
-    XID ks = XKeycodeToKeysym(XtDisplay(appInfo.shell), ke->keycode, c);
-    printf("key '%c'\n", (char)ks);
-    if (ks == 'q') {
-        exit(0);
-    }
-*/
     char buffer[16];
     KeySym keysym;
     int num_chars = XLookupString(&event->xkey, buffer, sizeof(buffer) - 1, &keysym, NULL);
