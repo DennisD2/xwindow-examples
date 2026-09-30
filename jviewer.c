@@ -35,6 +35,7 @@ typedef struct {
     Widget canvas;
     XtAppContext app;
     char *dirPath;
+    int state;
 } ImageInfo;
 
 ImageInfo imageInfo;
@@ -362,6 +363,9 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
 }
 
 
+#define S_NORMAL 0
+#define S_PAUSE 1
+
 /*
  * Timeout callback
  */
@@ -369,6 +373,11 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     //printf("TimeoutCB\n");
     unsigned char *data;
     int png_bytes;
+
+    if (imageInfo.state == S_PAUSE) {
+        XtAppAddTimeOut( imageInfo.app, TIMEOUT_NOSECONDS, TimeoutCB, NULL );
+        return;
+    }
 
     char *file = filenames[current];
     current++;
@@ -393,14 +402,32 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     XtAppAddTimeOut( imageInfo.app, TIMEOUT_NOSECONDS, TimeoutCB, NULL );
 }
 
+
+static void canvasButtonEventHandler (Widget w, XtPointer clientData, XEvent *event, Boolean *flag ) {
+    //printf("canvasButtonEventHandler\n");
+    if (imageInfo.state == S_NORMAL) {
+        imageInfo.state = S_PAUSE;
+        printf("paused\n");
+    } else {
+        imageInfo.state = S_NORMAL;
+        printf("normal\n");
+    }
+}
+
 void main( int argc, char **argv ) {
     Widget       canvas, shell;
     XtAppContext app;
 
     char *baseDir = ".";
-    if (argc == 2) {
+    if (argc >= 2) {
         baseDir = argv[1];
     }
+
+    int startIndex = 0;
+    if (argc == 3) {
+        startIndex = atoi(argv[2]);
+    }
+    printf("basedir=%s, startIndex = %d\n", baseDir, startIndex);
 
     readpng_version_info();
 
@@ -429,7 +456,14 @@ void main( int argc, char **argv ) {
     }
     closedir(dir);
 
+    if (startIndex >= maximage) {
+        printf("Start index %d larger than number of images %d, ignoring.\n", startIndex, maximage);
+    }
+    current = startIndex;
+
     canvas = createPixmapCanvas( shell,  filenames[0] );
+    XtAddEventHandler ( canvas, ButtonPressMask, FALSE,
+                canvasButtonEventHandler, NULL );
 
     printf("Number of files: %d\n", maximage);
 
