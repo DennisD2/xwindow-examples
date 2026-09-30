@@ -40,7 +40,7 @@ typedef struct {
     Widget shell;
     Widget canvas;
     XtAppContext app;
-    int timeout;
+    //int timeout;
     int state;
 } AppInfo;
 
@@ -267,17 +267,21 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
 
 static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     //printf("TimeoutCB, currentframe=%d\n", currentframe);
+
+    // Get time value for XtAppAddTimeOut()
+    imageInfo.image = anim.frames[anim.currentframe];
+    int frameTimeout = anim.delays[anim.currentframe];
+
     if (appInfo.state==S_PAUSE) {
-        XtAppAddTimeOut( appInfo.app, appInfo.timeout, TimeoutCB, NULL );
+        XtAppAddTimeOut( appInfo.app, frameTimeout, TimeoutCB, NULL );
         return;
     }
 
-    imageInfo.image = anim.frames[anim.currentframe];
     imageInfo.width = anim.width;
     imageInfo.height = anim.height;
+
     if (anim.frames[anim.currentframe] != NULL) {
         imageInfo.depth = anim.frames[anim.currentframe]->depth;
-        appInfo.timeout = anim.delays[anim.currentframe];
 
         anim.currentframe++;
         if (anim.currentframe == anim.frame_count) {
@@ -289,7 +293,7 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
         /*
          * start time out from the beginning
         */
-        XtAppAddTimeOut( appInfo.app, appInfo.timeout, TimeoutCB, NULL );
+        XtAppAddTimeOut( appInfo.app, frameTimeout, TimeoutCB, NULL );
     }
 }
 
@@ -316,7 +320,7 @@ int main( int argc, char **argv ) {
                                          xmMainWindowWidgetClass,
                                          shell, NULL, 0 );
     appInfo.shell = shell;
-    appInfo.timeout = 0;
+    //appInfo.timeout = 0;
 
     char *file = "test-images/halbes_pferd.gif";
     if (argc > 1) {
