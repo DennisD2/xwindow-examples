@@ -51,7 +51,6 @@ typedef struct {
 
 AppInfo appInfo;
 
-
 Widget createPixmapCanvas (Widget parent, char *fileName);
 
 void readpng_version_info() {
