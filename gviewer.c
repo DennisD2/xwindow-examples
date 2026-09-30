@@ -15,21 +15,28 @@
 #include <X11/extensions/Xrender.h>
 
 #define DEF_TIMEOUT_NOSECONDS 200L
-int timeout = DEF_TIMEOUT_NOSECONDS;
+#define MAX_FRAMES 500
+
+#define S_NORMAL 0
+#define S_PAUSE 1
 
 typedef struct {
     XImage *image;
     int width;
     int height;
     unsigned int depth;
-    Widget shell;
-    Widget canvas;
-    XtAppContext app;
 } ImageInfo;
 
 ImageInfo imageInfo;
 
-#define MAX_FRAMES 500
+typedef struct {
+    Widget shell;
+    Widget canvas;
+    XtAppContext app;
+    int timeout;
+} AppInfo;
+
+AppInfo appInfo;
 
 typedef struct {
     XImage *frames[MAX_FRAMES];
@@ -190,7 +197,7 @@ void resizeCallback(Widget canvas, XtPointer xt_pointer, XtPointer xt_pointer1) 
     handleGeometryChanges(canvas);
 }
 
-XImage *load_gif_to_ximage(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
+XImage *loadGIFtoXImage(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
     int *w, int *h) {
     gd_GIF *gif = gd_open_gif(filename);
     if (!gif) {
@@ -234,7 +241,7 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
     Display *dpy = XtDisplay(parent);
 
     canvas = XtCreateManagedWidget ( "canvas", xmDrawingAreaWidgetClass, parent, NULL, 0 );
-    imageInfo.canvas = canvas;
+    appInfo.canvas = canvas;
     XtAddCallback ( canvas, XmNexposeCallback, exposeCallback,  ( XtPointer )NULL );
     XtAddCallback ( canvas, XmNresizeCallback, resizeCallback, ( XtPointer )NULL );
 
@@ -242,22 +249,18 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
     imageInfo.depth = DefaultDepth(dpy, screen);
 
     if (endsWith(fileName, ".gif")) {
-        Display *dpy = XtDisplay(imageInfo.shell);
+        Display *dpy = XtDisplay(appInfo.shell);
         Visual *v = DefaultVisual(dpy, DefaultScreen(dpy));
-        imageInfo.image = load_gif_to_ximage(dpy, v, imageInfo.depth, fileName,
+        imageInfo.image = loadGIFtoXImage(dpy, v, imageInfo.depth, fileName,
             &(imageInfo.width), &(imageInfo.height));
     }
     return canvas;
 }
 
-
-#define S_NORMAL 0
-#define S_PAUSE 1
-
 static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     //printf("TimeoutCB, currentframe=%d\n", currentframe);
     if (anim.state==S_PAUSE) {
-        XtAppAddTimeOut( imageInfo.app, timeout, TimeoutCB, NULL );
+        XtAppAddTimeOut( appInfo.app, appInfo.timeout, TimeoutCB, NULL );
         return;
     }
 
@@ -266,22 +269,21 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     imageInfo.height = anim.height;
     if (anim.frames[anim.currentframe] != NULL) {
         imageInfo.depth = anim.frames[anim.currentframe]->depth;
-        timeout = anim.delays[anim.currentframe];
+        appInfo.timeout = anim.delays[anim.currentframe];
 
         anim.currentframe++;
         if (anim.currentframe == anim.frame_count) {
             anim.currentframe = 0;
         }
 
-        XtVaSetValues(XtParent(imageInfo.canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
-        handleGeometryChanges(imageInfo.canvas);
+        XtVaSetValues(XtParent(appInfo.canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
+        handleGeometryChanges(appInfo.canvas);
         /*
          * start time out from the beginning
         */
-        XtAppAddTimeOut( imageInfo.app, timeout, TimeoutCB, NULL );
+        XtAppAddTimeOut( appInfo.app, appInfo.timeout, TimeoutCB, NULL );
     }
 }
-
 
 static void canvasButtonEventHandler (Widget w, XtPointer clientData, XEvent *event, Boolean *flag ) {
     //printf("canvasButtonEventHandler\n");
@@ -299,13 +301,14 @@ int main( int argc, char **argv ) {
 
     Widget shell = XtAppInitialize ( &app, "XPmlogo", NULL, 0,
                               &argc, argv, NULL, NULL, 0  );
-    imageInfo.app = app;
+    appInfo.app = app;
     anim.state = S_NORMAL;
 
     Widget mainWindow = XtCreateManagedWidget ( "mainWindow",
                                          xmMainWindowWidgetClass,
                                          shell, NULL, 0 );
-    imageInfo.shell = shell;
+    appInfo.shell = shell;
+    appInfo.timeout = DEF_TIMEOUT_NOSECONDS;
 
     char *file = "test-images/halbes_pferd.gif";
     if (argc > 1) {
@@ -326,5 +329,3 @@ int main( int argc, char **argv ) {
 
     XtAppMainLoop ( app );
 }
-
-
