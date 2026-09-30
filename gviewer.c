@@ -123,7 +123,6 @@ XImage *gifCanvasToImage(Display *display, Visual *visual,
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             int canvas_index = 3*(y * width + x);
-            //uint8_t r = gif->canvas[canvas_index+0];
             uint8_t r = rgbBuffer[canvas_index+0];
             uint8_t g = rgbBuffer[canvas_index+1];
             uint8_t b = rgbBuffer[canvas_index+2];
@@ -218,16 +217,17 @@ XImage *loadGIFtoXImage(Display *dpy, Visual *visual, unsigned int depth, const 
     *h = gif->height;
     anim.frame_count = 0;
 
-    // Schleife läuft durch alle Frames
+    // loop trough all frames in GIF
     while (gd_get_frame(gif) && anim.frame_count < MAX_FRAMES) {
         uint8_t *rgbBuffer = malloc(anim.width * anim.height * 4);
         gd_render_frame(gif, rgbBuffer);
 
         anim.frames[anim.frame_count] = gifCanvasToImage(dpy, visual, gif, rgbBuffer, depth, &anim.width, &anim.height);
 
-        // 2. Speicher die Frame-Verzögerung (gif->gce.delay ist in Hundertstelsekunden, daher * 10 für Millisekunden)
+        // delay value is in 1/100s units - 10ms . Multiply with 10 to get value in milliseconds
+        // This value is needed by XtAppAddTimeOut()
         anim.delays[anim.frame_count] = gif->gce.delay * 10;
-        printf("Frame %d, delay=%d\n", anim.frame_count, anim.delays[anim.frame_count]);
+        printf("Frame %d\n", anim.frame_count);
 
         anim.frame_count++;
     }
