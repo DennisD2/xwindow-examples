@@ -29,16 +29,20 @@ typedef struct {
     XImage *image;
     int width;
     int height;
-    GC gc;
     unsigned int depth;
+} ImageInfo;
+
+ImageInfo imageInfo;
+
+typedef struct {
     Widget shell;
     Widget canvas;
     XtAppContext app;
     char *dirPath;
     int state;
-} ImageInfo;
+} AppInfo;
 
-ImageInfo imageInfo;
+AppInfo appInfo;
 
 char *filenames[10000];
 int maximage = 0;
@@ -73,7 +77,7 @@ XImage* load_jpeg_to_ximage(Display *dpy, Visual *visual, unsigned int depth, co
 
     // Open file
     char fn[128];
-    sprintf(fn,"%s/%s", imageInfo.dirPath, filename);
+    sprintf(fn,"%s/%s", appInfo.dirPath, filename);
     printf("Open file %d: %s\n", current, fn);
     if ((infile = fopen(fn, "rb")) == NULL) {
         fprintf(stderr, "Error opening %sn", filename);
@@ -216,16 +220,16 @@ void loadPng(FILE *file, unsigned char** data, char **clipData, unsigned int *wi
 
 /**
  * Handles geometry changes. uses XRender extension for fast scaling.
- * @param button widget with geometry changed
+ * @param canvas widget with geometry changed
  */
-void handleGeometryChanges(Widget button) {
-    Display *dpy = XtDisplay(button);
-    Window win = XtWindow(button);
+void handleGeometryChanges(Widget canvas) {
+    Display *dpy = XtDisplay(canvas);
+    Window win = XtWindow(canvas);
     XImage *src_ximage = imageInfo.image;
 
     // Get new geometry
     XtWidgetGeometry intended,prefered;
-    XtQueryGeometry(XtParent(button), &intended, &prefered);
+    XtQueryGeometry(XtParent(canvas), &intended, &prefered);
     Dimension new_w = prefered.width;
     Dimension new_h = prefered.height;
     //printf("new_w=%d, new_h=%d\n", new_w, new_h);
@@ -268,26 +272,25 @@ void handleGeometryChanges(Widget button) {
     XFreePixmap(dpy, temp_pixmap); // Die temporäre Pixmap kann wieder weg
 }
 
-void exposeCallback(Widget button, XtPointer xt_pointer, XtPointer xt_pointer1) {
+void exposeCallback(Widget canvas, XtPointer xt_pointer, XtPointer xt_pointer1) {
     //printf("exposeCallback()\n");
-    handleGeometryChanges(button);
-    XtVaSetValues(XtParent(button), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
+    handleGeometryChanges(canvas);
+    XtVaSetValues(XtParent(canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
 }
 
-void resizeCallback(Widget button, XtPointer xt_pointer, XtPointer xt_pointer1) {
+void resizeCallback(Widget canvas, XtPointer xt_pointer, XtPointer xt_pointer1) {
     //printf("resizeCallback()\n");
-    handleGeometryChanges(button);
-    //XtVaSetValues(XtParent(button), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
-    //XtVaSetValues(button, XmNresizePolicy, XmRESIZE_NONE, NULL);
-    //XtVaSetValues(XtParent(button), XmNallowShellResize, True, NULL);
+    handleGeometryChanges(canvas);
+    //XtVaSetValues(XtParent(canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
+    //XtVaSetValues(canvas, XmNresizePolicy, XmRESIZE_NONE, NULL);
+    //XtVaSetValues(XtParent(canvas), XmNallowShellResize, True, NULL);
 }
 
 bool loadPngFromFile(char *pngFile, unsigned char **data, int *png_bytes) {
-    Widget button;
     char *clip = NULL;
     // Open PNG file
     char fn[128];
-    sprintf(fn,"%s/%s", imageInfo.dirPath, pngFile);
+    sprintf(fn,"%s/%s", appInfo.dirPath, pngFile);
     printf("Open file %d: %s\n", current, fn);
     FILE *fp = fopen(fn, "rb");
     if (!fp) {
@@ -340,7 +343,7 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
     Display *dpy = XtDisplay(parent);
 
     canvas = XtCreateManagedWidget ( "canvas", xmDrawingAreaWidgetClass, parent, NULL, 0 );
-    imageInfo.canvas = canvas;
+    appInfo.canvas = canvas;
     XtAddCallback ( canvas, XmNexposeCallback, exposeCallback,  ( XtPointer )NULL );
     XtAddCallback ( canvas, XmNresizeCallback, resizeCallback, ( XtPointer )NULL );
 
@@ -351,10 +354,9 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
     imageInfo.depth = DefaultDepth(dpy, screen);
 
     if (endsWith(fileName, ".png")) {
-        createImageFromFile(imageInfo.shell, fileName, &data, png_bytes, &(imageInfo.image));
+        createImageFromFile(appInfo.shell, fileName, &data, png_bytes, &(imageInfo.image));
     }
     if (endsWith(fileName, ".jpg")) {
-        Display *dpy = XtDisplay(imageInfo.shell);
         Visual *v = DefaultVisual(dpy, DefaultScreen(dpy));
         imageInfo.image = load_jpeg_to_ximage(dpy, v, imageInfo.depth, fileName,
             &(imageInfo.width), &(imageInfo.height));
@@ -374,8 +376,8 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     unsigned char *data;
     int png_bytes;
 
-    if (imageInfo.state == S_PAUSE) {
-        XtAppAddTimeOut( imageInfo.app, TIMEOUT_NOSECONDS, TimeoutCB, NULL );
+    if (appInfo.state == S_PAUSE) {
+        XtAppAddTimeOut( appInfo.app, TIMEOUT_NOSECONDS, TimeoutCB, NULL );
         return;
     }
 
@@ -386,30 +388,30 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     }
     XDestroyImage(imageInfo.image);
     if (endsWith(file, ".png")) {
-        createImageFromFile(imageInfo.shell, file, &data, png_bytes, &(imageInfo.image));
+        createImageFromFile(appInfo.shell, file, &data, png_bytes, &(imageInfo.image));
     }
     if (endsWith(file, ".jpg")) {
-        Display *dpy = XtDisplay(imageInfo.shell);
+        Display *dpy = XtDisplay(appInfo.shell);
         Visual *v = DefaultVisual(dpy, DefaultScreen(dpy));
         imageInfo.image = load_jpeg_to_ximage(dpy, v, imageInfo.depth, file,
             &imageInfo.width, &imageInfo.height);
     }
-    XtVaSetValues(XtParent(imageInfo.canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
-    handleGeometryChanges(imageInfo.canvas);
+    XtVaSetValues(XtParent(appInfo.canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
+    handleGeometryChanges(appInfo.canvas);
     /*
      * start time out from the beginning
      */
-    XtAppAddTimeOut( imageInfo.app, TIMEOUT_NOSECONDS, TimeoutCB, NULL );
+    XtAppAddTimeOut( appInfo.app, TIMEOUT_NOSECONDS, TimeoutCB, NULL );
 }
 
 
-static void canvasButtonEventHandler (Widget w, XtPointer clientData, XEvent *event, Boolean *flag ) {
-    //printf("canvasButtonEventHandler\n");
-    if (imageInfo.state == S_NORMAL) {
-        imageInfo.state = S_PAUSE;
+static void canvascanvasEventHandler (Widget w, XtPointer clientData, XEvent *event, Boolean *flag ) {
+    //printf("canvascanvasEventHandler\n");
+    if (appInfo.state == S_NORMAL) {
+        appInfo.state = S_PAUSE;
         printf("paused\n");
     } else {
-        imageInfo.state = S_NORMAL;
+        appInfo.state = S_NORMAL;
         printf("normal\n");
     }
 }
@@ -433,13 +435,13 @@ void main( int argc, char **argv ) {
 
     shell = XtAppInitialize ( &app, "XPmlogo", NULL, 0,
                               &argc, argv, NULL, NULL, 0  );
-    imageInfo.app = app;
-    imageInfo.shell = shell;
+    appInfo.app = app;
+    appInfo.shell = shell;
 
     DIR *dir;
     struct dirent *entry;
-    imageInfo.dirPath = baseDir;
-    dir = opendir( imageInfo.dirPath);
+    appInfo.dirPath = baseDir;
+    dir = opendir( appInfo.dirPath);
     if (dir == NULL) {
         perror("Fehler beim Öffnen des Verzeichnisses");
         return;
@@ -463,7 +465,7 @@ void main( int argc, char **argv ) {
 
     canvas = createPixmapCanvas( shell,  filenames[0] );
     XtAddEventHandler ( canvas, ButtonPressMask, FALSE,
-                canvasButtonEventHandler, NULL );
+                canvascanvasEventHandler, NULL );
 
     printf("Number of files: %d\n", maximage);
 
