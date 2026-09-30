@@ -297,15 +297,25 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     }
 }
 
-static void canvasButtonEventHandler (Widget w, XtPointer clientData, XEvent *event, Boolean *flag ) {
-    //printf("canvasButtonEventHandler\n");
-    if (appInfo.state == S_NORMAL) {
-        appInfo.state = S_PAUSE;
-        printf("paused\n");
-    } else {
-        appInfo.state = S_NORMAL;
-        printf("normal\n");
+static void canvasKeyEventHandler(Widget widget, XtPointer clientData, XEvent * event, Boolean * flag) {
+    //printf("canvasKeyEventHandler\n");
+    XKeyEvent *ke = (XKeyEvent *) event;
+    int c;
+    XID ks = XKeycodeToKeysym(XtDisplay(appInfo.shell), ke->keycode, c);
+    printf("key '%c'\n", (char)ks);
+    if (ks == 'q') {
+        exit(0);
     }
+    if ((char)ks==' ') {
+        if (appInfo.state == S_NORMAL) {
+            appInfo.state = S_PAUSE;
+            printf("paused\n");
+        } else {
+            appInfo.state = S_NORMAL;
+            printf("normal\n");
+        }
+    }
+
 }
 
 int main( int argc, char **argv ) {
@@ -329,8 +339,8 @@ int main( int argc, char **argv ) {
 
     anim.currentframe = 0;
     Widget canvas = createPixmapCanvas(mainWindow, file);
-    XtAddEventHandler ( canvas, ButtonPressMask, FALSE,
-                    canvasButtonEventHandler, NULL );
+    XtAddEventHandler ( canvas, KeyPressMask, FALSE,
+                canvasKeyEventHandler, NULL );
     // Now we have correct size of gif
     XtVaSetValues(mainWindow, XmNwidth, anim.width, XmNheight, anim.height, NULL);
 

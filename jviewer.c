@@ -397,17 +397,41 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     XtAppAddTimeOut( appInfo.app, TIMEOUT_NOSECONDS, TimeoutCB, NULL );
 }
 
+static void canvasKeyEventHandler(Widget widget, XtPointer clientData, XEvent * event, Boolean * flag) {
+    //printf("canvasKeyEventHandler\n");
+    XKeyEvent *ke = (XKeyEvent *) event;
+    int c;
+    XID ks = XKeycodeToKeysym(XtDisplay(appInfo.shell), ke->keycode, c);
+    printf("key '%c'\n", (char)ks);
+    if (ks == 'q') {
+        exit(0);
+    }
+    if ((char)ks==' ') {
+        if (appInfo.state == S_NORMAL) {
+            appInfo.state = S_PAUSE;
+            printf("paused\n");
+        } else {
+            appInfo.state = S_NORMAL;
+            printf("normal\n");
+        }
+    }
 
-static void canvascanvasEventHandler (Widget w, XtPointer clientData, XEvent *event, Boolean *flag ) {
-    //printf("canvascanvasEventHandler\n");
-    if (appInfo.state == S_NORMAL) {
-        appInfo.state = S_PAUSE;
-        printf("paused\n");
-    } else {
-        appInfo.state = S_NORMAL;
-        printf("normal\n");
+    if ((char)ks=='Q') {
+        current--;
+        if (current<0) {
+            current=0;
+        }
+        printf("current=%d\n", current);
+    }
+    if ((char)ks=='S') {
+        current++;
+        if (current==maximage) {
+            current=0;
+        }
+        printf("current=%d\n", current);
     }
 }
+
 
 void main( int argc, char **argv ) {
     Widget canvas, shell;
@@ -457,8 +481,8 @@ void main( int argc, char **argv ) {
     current = startIndex;
 
     canvas = createPixmapCanvas( shell,  filenames[0] );
-    XtAddEventHandler ( canvas, ButtonPressMask, FALSE,
-                canvascanvasEventHandler, NULL );
+    XtAddEventHandler ( canvas, KeyPressMask, FALSE,
+            canvasKeyEventHandler, NULL );
 
     printf("Number of files: %d\n", maximage);
 
