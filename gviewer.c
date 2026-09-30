@@ -88,7 +88,7 @@ void dumpFrames(GifAnimation *a) {
     }
 }
 
-XImage *gifCanvasToImage(Display *display, Visual *visual,
+XImage *loadGIFToXImage(Display *display, Visual *visual,
     gd_GIF *gif , uint8_t *rgbBuffer, unsigned int depth,
     int *w, int *h) {
     if (!gif || !gif->canvas || !gif->palette) {
@@ -204,7 +204,7 @@ void resizeCallback(Widget canvas, XtPointer xt_pointer, XtPointer xt_pointer1) 
     handleGeometryChanges(canvas);
 }
 
-XImage *loadGIFtoXImage(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
+XImage *loadGIFtoXImages(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
     int *w, int *h) {
     gd_GIF *gif = gd_open_gif(filename);
     if (!gif) {
@@ -222,7 +222,7 @@ XImage *loadGIFtoXImage(Display *dpy, Visual *visual, unsigned int depth, const 
         uint8_t *rgbBuffer = malloc(anim.width * anim.height * 4);
         gd_render_frame(gif, rgbBuffer);
 
-        anim.frames[anim.frame_count] = gifCanvasToImage(dpy, visual, gif, rgbBuffer, depth, &anim.width, &anim.height);
+        anim.frames[anim.frame_count] = loadGIFToXImage(dpy, visual, gif, rgbBuffer, depth, &anim.width, &anim.height);
 
         // delay value is in 1/100s units - 10ms . Multiply with 10 to get value in milliseconds
         // This value is needed by XtAppAddTimeOut()
@@ -259,7 +259,7 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
     if (endsWith(fileName, ".gif")) {
         Display *dpy = XtDisplay(appInfo.shell);
         Visual *v = DefaultVisual(dpy, DefaultScreen(dpy));
-        imageInfo.image = loadGIFtoXImage(dpy, v, imageInfo.depth, fileName,
+        imageInfo.image = loadGIFtoXImages(dpy, v, imageInfo.depth, fileName,
             &(imageInfo.width), &(imageInfo.height));
     }
     return canvas;

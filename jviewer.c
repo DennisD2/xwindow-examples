@@ -53,6 +53,17 @@ AppInfo appInfo;
 
 Widget createPixmapCanvas (Widget parent, char *fileName);
 
+int endsWith(const char *str, const char *suffix) {
+    size_t len_str = strlen(str);
+    size_t len_suffix = strlen(suffix);
+
+    if (len_suffix > len_str) {
+        return false;
+    }
+
+    return strcmp(str + (len_str - len_suffix), suffix) == 0;
+}
+
 void readpng_version_info() {
     fprintf(stderr, "   Compiled with libpng %s; using libpng %s.\n",
       PNG_LIBPNG_VER_STRING, png_libpng_ver);
@@ -70,7 +81,7 @@ static void teardownPng (png_structp png, png_infop info) {
     }
 }
 
-XImage* load_jpeg_to_ximage(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
+XImage* loadJPEGToXImage(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
     int *w, int *h) {
     struct jpeg_decompress_struct cinfo;
     struct jpeg_error_mgr jerr;
@@ -237,6 +248,12 @@ void handleGeometryChanges(Widget canvas) {
     Dimension new_h = prefered.height;
     //printf("new_w=%d, new_h=%d\n", new_w, new_h);
 
+    // Prevent X errors as long as there is no physical window mapped
+    if (win == 0) {
+        printf("waiting for window becoming mapped...\n");
+        return;
+    }
+
     Pixmap temp_pixmap = XCreatePixmap(dpy, win,
                                        src_ximage->width, src_ximage->height,
                                        src_ximage->depth);
@@ -302,25 +319,14 @@ bool loadPngFromFile(char *pngFile, unsigned char **data, int *png_bytes) {
     return true;
 }
 
-bool createImageFromFile(Widget parent, char *pngFile, unsigned char **data, int png_bytes, XImage **image) {
-    if (loadPngFromFile(pngFile, data, &png_bytes)==false) return false;
+XImage *createImageFromFile(Widget parent, char *pngFile, unsigned char **data, int *png_bytes) {
+    if (loadPngFromFile(pngFile, data, png_bytes)==false) return false;
 
     Display *dpy = XtDisplay(parent);
     int screen = DefaultScreen(dpy);
-    *image = XCreateImage (dpy, DefaultVisual(dpy, screen),
-        DefaultDepth(dpy, screen), ZPixmap, 0, (char*)*data, imageInfo.width, imageInfo.height, 32, png_bytes);
-    return true;
-}
-
-int endsWith(const char *str, const char *suffix) {
-    size_t len_str = strlen(str);
-    size_t len_suffix = strlen(suffix);
-
-    if (len_suffix > len_str) {
-        return false;
-    }
-
-    return strcmp(str + (len_str - len_suffix), suffix) == 0;
+    XImage *image = XCreateImage (dpy, DefaultVisual(dpy, screen),
+        DefaultDepth(dpy, screen), ZPixmap, 0, (char*)*data, imageInfo.width, imageInfo.height, 32, *png_bytes);
+    return image;
 }
 
 Widget createPixmapCanvas(Widget parent, char *fileName) {
@@ -332,17 +338,18 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
     XtAddCallback ( canvas, XmNexposeCallback, exposeCallback,  ( XtPointer )NULL );
     XtAddCallback ( canvas, XmNresizeCallback, resizeCallback, ( XtPointer )NULL );
 
-    unsigned char *data;
-    int png_bytes;
+
     int screen = DefaultScreen(dpy);
     imageInfo.depth = DefaultDepth(dpy, screen);
 
     if (endsWith(fileName, ".png")) {
-        createImageFromFile(appInfo.shell, fileName, &data, png_bytes, &(imageInfo.image));
+        unsigned char *data;
+        int png_bytes;
+        imageInfo.image = createImageFromFile(appInfo.shell, fileName, &data, &png_bytes);
     }
     if (endsWith(fileName, ".jpg")) {
         Visual *v = DefaultVisual(dpy, DefaultScreen(dpy));
-        imageInfo.image = load_jpeg_to_ximage(dpy, v, imageInfo.depth, fileName,
+        imageInfo.image = loadJPEGToXImage(dpy, v, imageInfo.depth, fileName,
             &(imageInfo.width), &(imageInfo.height));
     }
     return canvas;
@@ -364,16 +371,18 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     if (appInfo.current==appInfo.maximage) {
         appInfo.current=0;
     }
+
     XDestroyImage(imageInfo.image);
-    unsigned char *data;
-    int png_bytes;
+
     if (endsWith(file, ".png")) {
-        createImageFromFile(appInfo.shell, file, &data, png_bytes, &(imageInfo.image));
+        int png_bytes;
+        unsigned char *data;
+        imageInfo.image = createImageFromFile(appInfo.shell, file, &data, &png_bytes);
     }
     if (endsWith(file, ".jpg")) {
         Display *dpy = XtDisplay(appInfo.shell);
         Visual *v = DefaultVisual(dpy, DefaultScreen(dpy));
-        imageInfo.image = load_jpeg_to_ximage(dpy, v, imageInfo.depth, file,
+        imageInfo.image = loadJPEGToXImage(dpy, v, imageInfo.depth, file,
             &imageInfo.width, &imageInfo.height);
     }
     XtVaSetValues(XtParent(appInfo.canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
