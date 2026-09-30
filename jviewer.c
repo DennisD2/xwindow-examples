@@ -366,8 +366,6 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
  */
 static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     //printf("TimeoutCB\n");
-    unsigned char *data;
-    int png_bytes;
 
     if (appInfo.state == S_PAUSE) {
         XtAppAddTimeOut( appInfo.app, TIMEOUT_NOSECONDS, TimeoutCB, NULL );
@@ -380,6 +378,8 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
         current=0;
     }
     XDestroyImage(imageInfo.image);
+    unsigned char *data;
+    int png_bytes;
     if (endsWith(file, ".png")) {
         createImageFromFile(appInfo.shell, file, &data, png_bytes, &(imageInfo.image));
     }

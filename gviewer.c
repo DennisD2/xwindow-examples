@@ -22,7 +22,6 @@
 #include <X11/Intrinsic.h>
 #include <X11/extensions/Xrender.h>
 
-#define DEF_TIMEOUT_NOSECONDS 200L
 #define MAX_FRAMES 500
 
 #define S_NORMAL 0
@@ -42,6 +41,7 @@ typedef struct {
     Widget canvas;
     XtAppContext app;
     int timeout;
+    int state;
 } AppInfo;
 
 AppInfo appInfo;
@@ -53,7 +53,7 @@ typedef struct {
     int width;
     int height;
     int currentframe;
-    int state;
+
 } GifAnimation;
 
 GifAnimation anim;
@@ -267,7 +267,7 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
 
 static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     //printf("TimeoutCB, currentframe=%d\n", currentframe);
-    if (anim.state==S_PAUSE) {
+    if (appInfo.state==S_PAUSE) {
         XtAppAddTimeOut( appInfo.app, appInfo.timeout, TimeoutCB, NULL );
         return;
     }
@@ -295,11 +295,11 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
 
 static void canvasButtonEventHandler (Widget w, XtPointer clientData, XEvent *event, Boolean *flag ) {
     //printf("canvasButtonEventHandler\n");
-    if (anim.state == S_NORMAL) {
-        anim.state = S_PAUSE;
+    if (appInfo.state == S_NORMAL) {
+        appInfo.state = S_PAUSE;
         printf("paused\n");
     } else {
-        anim.state = S_NORMAL;
+        appInfo.state = S_NORMAL;
         printf("normal\n");
     }
 }
@@ -310,13 +310,13 @@ int main( int argc, char **argv ) {
     Widget shell = XtAppInitialize ( &app, "XPmlogo", NULL, 0,
                               &argc, argv, NULL, NULL, 0  );
     appInfo.app = app;
-    anim.state = S_NORMAL;
+    appInfo.state = S_NORMAL;
 
     Widget mainWindow = XtCreateManagedWidget ( "mainWindow",
                                          xmMainWindowWidgetClass,
                                          shell, NULL, 0 );
     appInfo.shell = shell;
-    appInfo.timeout = DEF_TIMEOUT_NOSECONDS;
+    appInfo.timeout = 0;
 
     char *file = "test-images/halbes_pferd.gif";
     if (argc > 1) {
