@@ -432,7 +432,6 @@ static void canvasKeyEventHandler(Widget widget, XtPointer clientData, XEvent * 
     }
 }
 
-
 void main( int argc, char **argv ) {
     Widget canvas, shell;
     XtAppContext app;
