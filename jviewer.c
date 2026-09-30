@@ -312,19 +312,6 @@ bool createImageFromFile(Widget parent, char *pngFile, unsigned char **data, int
     return true;
 }
 
-/*
-int startsWith(const char *str, const char *prefix) {
-    size_t len_prefix = strlen(prefix);
-    size_t len_str = strlen(str);
-
-    if (len_prefix > len_str) {
-        return false;
-    }
-
-    return strncmp(str, prefix, len_prefix) == 0;
-}
-*/
-
 int endsWith(const char *str, const char *suffix) {
     size_t len_str = strlen(str);
     size_t len_suffix = strlen(suffix);
