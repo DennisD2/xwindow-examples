@@ -38,6 +38,7 @@ typedef struct {
     int width;
     int height;
     int currentframe;
+    int state;
 } GifAnimation;
 
 GifAnimation anim;
@@ -249,8 +250,16 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
     return canvas;
 }
 
+
+#define S_NORMAL 0
+#define S_PAUSE 1
+
 static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     //printf("TimeoutCB, currentframe=%d\n", currentframe);
+    if (anim.state==S_PAUSE) {
+        XtAppAddTimeOut( imageInfo.app, timeout, TimeoutCB, NULL );
+        return;
+    }
 
     imageInfo.image = anim.frames[anim.currentframe];
     imageInfo.width = anim.width;
@@ -273,17 +282,29 @@ static void TimeoutCB( XtPointer client_data, XtIntervalId* id ) {
     }
 }
 
+
+static void canvasButtonEventHandler (Widget w, XtPointer clientData, XEvent *event, Boolean *flag ) {
+    //printf("canvasButtonEventHandler\n");
+    if (anim.state == S_NORMAL) {
+        anim.state = S_PAUSE;
+        printf("paused\n");
+    } else {
+        anim.state = S_NORMAL;
+        printf("normal\n");
+    }
+}
+
 int main( int argc, char **argv ) {
     XtAppContext app;
 
     Widget shell = XtAppInitialize ( &app, "XPmlogo", NULL, 0,
                               &argc, argv, NULL, NULL, 0  );
     imageInfo.app = app;
+    anim.state = S_NORMAL;
 
     Widget mainWindow = XtCreateManagedWidget ( "mainWindow",
                                          xmMainWindowWidgetClass,
                                          shell, NULL, 0 );
-    XtVaSetValues(mainWindow, XmNwidth, 1000, XmNheight, 500, NULL);
     imageInfo.shell = shell;
 
     char *file = "test-images/halbes_pferd.gif";
@@ -293,6 +314,10 @@ int main( int argc, char **argv ) {
 
     anim.currentframe = 0;
     Widget canvas = createPixmapCanvas(mainWindow, file);
+    XtAddEventHandler ( canvas, ButtonPressMask, FALSE,
+                    canvasButtonEventHandler, NULL );
+    // Now we have correct size of gif
+    XtVaSetValues(mainWindow, XmNwidth, anim.width, XmNheight, anim.height, NULL);
 
     XtRealizeWidget ( shell );
 
