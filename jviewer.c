@@ -25,6 +25,9 @@
 
 #define TIMEOUT_NOSECONDS 10000L
 
+#define S_NORMAL 0
+#define S_PAUSE 1
+
 typedef struct {
     XImage *image;
     int width;
@@ -281,9 +284,6 @@ void exposeCallback(Widget canvas, XtPointer xt_pointer, XtPointer xt_pointer1) 
 void resizeCallback(Widget canvas, XtPointer xt_pointer, XtPointer xt_pointer1) {
     //printf("resizeCallback()\n");
     handleGeometryChanges(canvas);
-    //XtVaSetValues(XtParent(canvas), XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
-    //XtVaSetValues(canvas, XmNresizePolicy, XmRESIZE_NONE, NULL);
-    //XtVaSetValues(XtParent(canvas), XmNallowShellResize, True, NULL);
 }
 
 bool loadPngFromFile(char *pngFile, unsigned char **data, int *png_bytes) {
@@ -312,29 +312,27 @@ bool createImageFromFile(Widget parent, char *pngFile, unsigned char **data, int
     return true;
 }
 
+/*
 int startsWith(const char *str, const char *prefix) {
     size_t len_prefix = strlen(prefix);
     size_t len_str = strlen(str);
 
-    // Wenn das Suchmuster länger ist als der String, kann es nicht passen
     if (len_prefix > len_str) {
         return false;
     }
 
-    // Vergleiche die ersten 'len_prefix' Zeichen
     return strncmp(str, prefix, len_prefix) == 0;
 }
+*/
 
 int endsWith(const char *str, const char *suffix) {
     size_t len_str = strlen(str);
     size_t len_suffix = strlen(suffix);
 
-    // Wenn das Suffix länger ist als der String, kann es nicht passen
     if (len_suffix > len_str) {
         return false;
     }
 
-    // Setze den Zeiger an die Position, wo das Suffix im Hauptstring beginnen müsste
     return strcmp(str + (len_str - len_suffix), suffix) == 0;
 }
 
@@ -349,7 +347,6 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
 
     unsigned char *data;
     int png_bytes;
-
     int screen = DefaultScreen(dpy);
     imageInfo.depth = DefaultDepth(dpy, screen);
 
@@ -363,10 +360,6 @@ Widget createPixmapCanvas(Widget parent, char *fileName) {
     }
     return canvas;
 }
-
-
-#define S_NORMAL 0
-#define S_PAUSE 1
 
 /*
  * Timeout callback
@@ -417,7 +410,7 @@ static void canvascanvasEventHandler (Widget w, XtPointer clientData, XEvent *ev
 }
 
 void main( int argc, char **argv ) {
-    Widget       canvas, shell;
+    Widget canvas, shell;
     XtAppContext app;
 
     char *baseDir = ".";
