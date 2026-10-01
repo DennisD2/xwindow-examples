@@ -425,7 +425,7 @@ static void canvasKeyEventHandler(Widget widget, XtPointer clientData, XEvent * 
         if (keysym == XK_Left) {
             appInfo.current--;
             if (appInfo.current<0) {
-                appInfo.current=0;
+                appInfo.current=appInfo.maximage-1;
             }
             printf("current=%d\n", appInfo.current);
         }
