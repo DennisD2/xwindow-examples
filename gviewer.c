@@ -335,7 +335,6 @@ int main( int argc, char **argv ) {
                                          xmMainWindowWidgetClass,
                                          shell, NULL, 0 );
     appInfo.shell = shell;
-    //appInfo.timeout = 0;
 
     char *file = "test-images/halbes_pferd.gif";
     if (argc > 1) {
