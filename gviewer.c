@@ -68,7 +68,7 @@ int endsWith(const char *str, const char *suffix) {
     return strcmp(str + (len_str - len_suffix), suffix) == 0;
 }
 
-void dumpFrames(GifAnimation *a) {
+static void dumpFrames(GifAnimation *a) {
     printf("%d Frames, all %dx%d\n", a->frame_count, a->width, a->height);
     for (int i=0; i < a->frame_count; i++) {
 
@@ -88,7 +88,7 @@ void dumpFrames(GifAnimation *a) {
     }
 }
 
-XImage *loadGIFToXImage(Display *display, Visual *visual,
+static XImage *loadGIFToXImage(Display *display, Visual *visual,
     gd_GIF *gif , uint8_t *rgbBuffer, unsigned int depth,
     int *w, int *h) {
     if (!gif || !gif->canvas || !gif->palette) {
@@ -137,7 +137,7 @@ XImage *loadGIFToXImage(Display *display, Visual *visual,
  * Handles geometry changes. uses XRender extension for fast scaling.
  * @param canvas widget with geometry changed
  */
-void handleGeometryChanges(Widget canvas) {
+static void handleGeometryChanges(Widget canvas) {
     Display *dpy = XtDisplay(canvas);
     Window win = XtWindow(canvas);
     XImage *src_ximage = imageInfo.image;
@@ -193,18 +193,18 @@ void handleGeometryChanges(Widget canvas) {
     XFreePixmap(dpy, temp_pixmap); // Die temporäre Pixmap kann wieder weg
 }
 
-void exposeCallback(Widget canvas, XtPointer xt_pointer, XtPointer xt_pointer1) {
+static void exposeCallback(Widget canvas, XtPointer xt_pointer, XtPointer xt_pointer1) {
     //printf("exposeCallback()\n");
     handleGeometryChanges(canvas);
     //XtVaSetValues(imageInfo.shell, XmNwidth, imageInfo.width, XmNheight, imageInfo.height, NULL);
 }
 
-void resizeCallback(Widget canvas, XtPointer xt_pointer, XtPointer xt_pointer1) {
+static void resizeCallback(Widget canvas, XtPointer xt_pointer, XtPointer xt_pointer1) {
     //printf("resizeCallback()\n");
     handleGeometryChanges(canvas);
 }
 
-XImage *loadGIFtoXImages(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
+static XImage *loadGIFtoXImages(Display *dpy, Visual *visual, unsigned int depth, const char *filename,
     int *w, int *h) {
     gd_GIF *gif = gd_open_gif(filename);
     if (!gif) {
@@ -244,7 +244,7 @@ XImage *loadGIFtoXImages(Display *dpy, Visual *visual, unsigned int depth, const
     return anim.frames[0];
 }
 
-Widget createPixmapCanvas(Widget parent, char *fileName) {
+static Widget createPixmapCanvas(Widget parent, char *fileName) {
     Widget canvas;
     Display *dpy = XtDisplay(parent);
 
